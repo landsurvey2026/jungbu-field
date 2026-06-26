@@ -319,6 +319,28 @@
   @media (min-width: 1100px){
     .list{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}
   }
+
+  /* 모바일에서 엑셀 버튼 숨김 (관리자만 사용) */
+  @media (max-width: 767px){
+    .tool-btn.export{display:none !important}
+  }
+
+  /* ---------- 관리자 패널 카드 ---------- */
+  .admin-card{background:var(--ink2); border:1px solid var(--line); border-radius:11px; overflow:hidden; margin-bottom:14px}
+  .admin-card-head{padding:11px 14px; background:#0e1626; border-bottom:1px solid var(--line); font-size:13px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px}
+  .admin-card-body{padding:14px}
+  .admin-card-body input{width:100%; background:#0a121e; border:1px solid var(--line); border-radius:9px; padding:10px 12px; font-size:13px; color:var(--text); outline:none}
+  .admin-card-body input:focus{border-color:var(--accent)}
+  .admin-card-body code{font-family:var(--mono); background:#0a121e; padding:2px 8px; border-radius:5px; font-size:11.5px; border:1px solid var(--line)}
+  .dev-row{display:flex; align-items:center; gap:10px; padding:10px 12px; background:#0a121e; border:1px solid var(--line); border-radius:9px; margin-bottom:6px}
+  .dev-row.empty{opacity:.4; font-style:italic}
+  .dev-row.me{border-color:var(--accent)}
+  .dev-info{flex:1; font-size:12px}
+  .dev-info .dn{font-weight:700; color:var(--text)}
+  .dev-info .dt{font-family:var(--mono); color:var(--text-dim); font-size:10.5px; margin-top:2px}
+  .dev-info .me-tag{display:inline-block; background:var(--accent); color:#04231a; font-size:10px; padding:1px 6px; border-radius:4px; margin-left:6px; font-weight:700}
+  .dev-rm{background:none; border:1px solid var(--warn-r); color:var(--warn-r); font-size:11px; padding:5px 9px; border-radius:6px; cursor:pointer; font-weight:600}
+  .dev-rm:hover{background:rgba(239,68,68,.1)}
 </style>
 </head>
 <body>
@@ -350,6 +372,7 @@
       <div class="h-user">
         <div class="who" id="hWho">―</div>
         <div style="font-size:10px; color:var(--text-dim)"><span class="sync-dot off" id="syncDot"></span><span id="syncTxt">연결 중...</span></div>
+        <button id="adminBtn" style="display:none; margin-top:6px; background:var(--accent-dim); color:#d1fae5; border:1px solid var(--accent); padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer">⚙️ 관리자</button>
       </div>
     </div>
     <div class="kpis">
@@ -462,11 +485,11 @@
       </div>
       <div class="field-row">
         <div class="field">
-          <label>작업 시작일</label>
+          <label>공사 예정일 <span style="color:var(--text-dim); font-weight:400; font-size:10.5px">(=공사예정 단계 날짜)</span></label>
           <input id="fStart" type="date" autocomplete="off">
         </div>
         <div class="field">
-          <label>작업 종료일</label>
+          <label>공사 완료일 <span style="color:var(--text-dim); font-weight:400; font-size:10.5px">(=공사완료 단계 날짜)</span></label>
           <input id="fEnd" type="date" autocomplete="off">
         </div>
       </div>
@@ -484,6 +507,72 @@
       <button class="close" data-close="detailModal">✕</button>
     </div>
     <div class="modal-content" id="detailContent"></div>
+  </div>
+</div>
+
+<!-- ============== 관리자 패널 모달 ============== -->
+<div class="modal" id="adminModal">
+  <div class="modal-body">
+    <div class="modal-head">
+      <h2>⚙️ 관리자 패널</h2>
+      <button class="close" data-close="adminModal">✕</button>
+    </div>
+    <div class="modal-content">
+
+      <!-- 공유 주소 -->
+      <div class="admin-card">
+        <div class="admin-card-head">🔗 공유 주소</div>
+        <div class="admin-card-body">
+          <input id="adminUrl" readonly style="font-family:var(--mono); font-size:11.5px">
+          <div style="display:flex; gap:6px; margin-top:8px">
+            <button class="btn-ghost" style="flex:1; margin:0" onclick="copyAdminUrl()">📋 복사</button>
+            <button class="btn-ghost" style="flex:1; margin:0" onclick="detectAdminUrl()">🔄 현재 주소</button>
+          </div>
+          <div style="margin-top:8px">
+            <button class="btn-primary" style="margin:0" onclick="saveAdminUrl()">💾 주소 저장</button>
+          </div>
+          <div style="font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5">
+            💡 직원들에게 이 주소를 공유하면 각자 핸드폰으로 접속할 수 있습니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- 사용자 비밀번호 -->
+      <div class="admin-card">
+        <div class="admin-card-head">🔑 사용자 비밀번호</div>
+        <div class="admin-card-body">
+          <input id="adminPwUser" type="text" placeholder="새 사용자 비밀번호 (직원용)" autocomplete="off">
+          <button class="btn-primary" style="margin-top:8px" onclick="saveUserPassword()">💾 사용자 비밀번호 변경</button>
+          <div style="font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5">
+            현재 비밀번호: <code style="font-family:var(--mono); color:var(--accent)" id="adminPwUserCur">―</code>
+          </div>
+        </div>
+      </div>
+
+      <!-- 관리자 비밀번호 -->
+      <div class="admin-card">
+        <div class="admin-card-head">🔐 관리자 비밀번호</div>
+        <div class="admin-card-body">
+          <input id="adminPwAdmin" type="text" placeholder="새 관리자 비밀번호" autocomplete="off">
+          <button class="btn-primary" style="margin-top:8px" onclick="saveAdminPassword()">💾 관리자 비밀번호 변경</button>
+          <div style="font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5">
+            ⚠️ 관리자 비밀번호는 본인과 부관리자 1명만 알고 있어야 합니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- 관리자 PC 관리 -->
+      <div class="admin-card">
+        <div class="admin-card-head">💻 등록된 관리자 PC <span id="devCount" style="margin-left:auto; font-family:var(--mono); font-size:12px; color:var(--accent)">(0/2)</span></div>
+        <div class="admin-card-body">
+          <div id="devList"></div>
+          <div style="font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5">
+            💡 관리자 PC를 변경하려면 기존 PC를 제거한 후, 새 PC에서 관리자로 로그인하세요.
+          </div>
+        </div>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -510,13 +599,14 @@ const firebaseConfig = {
 };
 
 /* 접속 비밀번호 — 사업소 내부에서만 공유하세요 ⬇️ 이 부분만 본인이 정한 비밀번호로 바꾸세요 */
-const APP_PASSWORD = "j2026";
+const APP_PASSWORD = "여기에비밀번호입력";
 
 /* ============================================================
    2. 상태 & 유틸
    ============================================================ */
 const state = {
   user: null,
+  role: null,                // 'user' | 'admin'
   orders: [],
   unsub: null,
   unsubChat: null,
@@ -526,8 +616,28 @@ const state = {
   initialLoad: true,
   seenChatCounts: {},       // 채팅 안읽음 표시용
   searchQuery: '',          // 검색어
-  viewMode: 'card'          // 'card' | 'table'
+  viewMode: 'card',         // 'card' | 'table'
+  configLoaded: false,
+  passwords: { app: null, admin: null, url: null }
 };
+
+/* 기본 비밀번호 (Firestore에 저장된 값이 있으면 그게 우선) */
+const DEFAULT_ADMIN_PASSWORD = "관리자2026";
+
+/* 모바일 감지 */
+function isMobile(){
+  return /iPhone|iPad|iPod|Android|Mobile/i.test(navigator.userAgent) || window.matchMedia('(max-width: 767px)').matches;
+}
+
+/* 디바이스 ID (localStorage에 영구 저장) */
+function getDeviceId(){
+  let id = localStorage.getItem('jungbu_device_id');
+  if(!id){
+    id = 'dev_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
+    localStorage.setItem('jungbu_device_id', id);
+  }
+  return id;
+}
 
 const today = () => {
   const d = new Date();
@@ -609,7 +719,7 @@ function doLogin(){
   const err = document.getElementById('gErr');
 
   if(!name){ err.textContent = '이름을 입력해주세요.'; return; }
-  if(pw !== APP_PASSWORD){ err.textContent = '비밀번호가 틀렸습니다.'; return; }
+  if(!pw){ err.textContent = '비밀번호를 입력해주세요.'; return; }
 
   if(!initFirebase()) return;
 
@@ -617,12 +727,54 @@ function doLogin(){
   err.style.color = 'var(--accent)';
 
   auth.signInAnonymously()
-    .then(() => {
+    .then(async () => {
+      // 설정값 로드 (실패해도 기본값으로 진행)
+      await loadConfig();
+
+      const appPw = state.passwords.app || APP_PASSWORD;
+      const adminPw = state.passwords.admin || DEFAULT_ADMIN_PASSWORD;
+
+      let role = null;
+      if(pw === adminPw) role = 'admin';
+      else if(pw === appPw) role = 'user';
+      else {
+        err.textContent = '비밀번호가 틀렸습니다.';
+        err.style.color = '#fb7185';
+        return;
+      }
+
+      // 관리자 모드: 모바일 차단 + 디바이스 2대 제한
+      if(role === 'admin'){
+        if(isMobile()){
+          err.textContent = '🚫 관리자는 PC에서만 접속 가능합니다.';
+          err.style.color = '#fb7185';
+          return;
+        }
+        const allowed = await checkAdminDevice(name);
+        if(!allowed){
+          err.textContent = '🚫 관리자 PC는 최대 2대까지 등록 가능합니다.';
+          err.style.color = '#fb7185';
+          return;
+        }
+      }
+
+      // 로그인 성공
       state.user = { name, uid: auth.currentUser.uid };
+      state.role = role;
       localStorage.setItem('jungbu_name', name);
       document.getElementById('gate').style.display = 'none';
       document.getElementById('app').style.display = 'flex';
-      document.getElementById('hWho').textContent = name + ' 님';
+      document.getElementById('hWho').textContent = name + (role === 'admin' ? ' 님 🔐' : ' 님');
+
+      // 관리자 UI 표시
+      if(role === 'admin'){
+        document.getElementById('adminBtn').style.display = 'inline-block';
+      }
+      // 모바일에서 엑셀 버튼 숨김
+      if(isMobile()){
+        document.getElementById('btnExport').style.display = 'none';
+      }
+
       subscribeOrders();
       checkNotificationPerm();
     })
@@ -630,6 +782,55 @@ function doLogin(){
       err.textContent = '연결 실패: ' + e.message;
       err.style.color = '#fb7185';
     });
+}
+
+/* 설정값 로드 (Firestore /config/main) */
+async function loadConfig(){
+  if(state.configLoaded) return;
+  try{
+    const doc = await db.collection('config').doc('main').get();
+    if(doc.exists){
+      const d = doc.data();
+      state.passwords.app = d.appPassword || null;
+      state.passwords.admin = d.adminPassword || null;
+      state.passwords.url = d.appUrl || null;
+    }
+  }catch(e){
+    console.warn('설정 로드 실패 (기본값 사용):', e.message);
+  }
+  state.configLoaded = true;
+}
+
+/* 관리자 디바이스 체크 (2대 제한) */
+async function checkAdminDevice(name){
+  const deviceId = getDeviceId();
+  const ref = db.collection('adminDevices').doc(deviceId);
+
+  try{
+    const doc = await ref.get();
+    if(doc.exists){
+      // 이미 등록된 PC
+      await ref.update({ lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(), lastLoginBy: name });
+      return true;
+    }
+    // 새 PC: 자리가 남아있는지 체크
+    const all = await db.collection('adminDevices').get();
+    if(all.size >= 2) return false;
+
+    // 등록
+    await ref.set({
+      name: name + '의 PC',
+      registeredAt: firebase.firestore.FieldValue.serverTimestamp(),
+      registeredBy: name,
+      lastLoginAt: firebase.firestore.FieldValue.serverTimestamp(),
+      lastLoginBy: name
+    });
+    return true;
+  }catch(e){
+    console.error('디바이스 체크 실패:', e);
+    alert('관리자 디바이스 확인 실패: ' + e.message + '\n\nFirestore 보안 규칙이 업데이트되었는지 확인해주세요.');
+    return false;
+  }
 }
 
 // 저장된 이름 자동 입력
@@ -925,8 +1126,10 @@ function openForm(order){
   document.getElementById('fBoss').value = order?.bossName || '';
   document.getElementById('fPhone').value = order?.bossPhone || '';
   document.getElementById('fLen').value = order?.length || '';
-  document.getElementById('fStart').value = order?.startDate || '';
-  document.getElementById('fEnd').value = order?.endDate || '';
+  // 공사예정일 = plannedDate (구버전 호환: startDate fallback)
+  document.getElementById('fStart').value = order?.plannedDate || order?.startDate || '';
+  // 공사완료일 = completedDate (구버전 호환: endDate fallback)
+  document.getElementById('fEnd').value = order?.completedDate || order?.endDate || '';
   document.getElementById('fNoWarn').classList.remove('show');
   document.getElementById('formModal').classList.add('show');
 }
@@ -937,6 +1140,8 @@ document.getElementById('fNo').addEventListener('input', () => {
   const editId = document.getElementById('fId').value;
   const warn = document.getElementById('fNoWarn');
   if(!no){ warn.classList.remove('show'); return; }
+  // "미지시"는 중복 허용
+  if(no === '미지시'){ warn.classList.remove('show'); return; }
   const dup = state.orders.find(o => o.no === no && o.id !== editId);
   if(dup){
     warn.innerHTML = `⚠ <strong>이미 등록된 지시번호입니다.</strong><br>「${esc(dup.name||'─')}」 (${esc(dup.createdBy||'?')} 등록)`;
@@ -962,12 +1167,17 @@ document.getElementById('fSave').onclick = async () => {
   if(!no){ alert('지시번호를 입력해주세요.'); return; }
   if(!name){ alert('공사명을 입력해주세요.'); return; }
 
-  // 중복 체크 (저장 직전에도 확인)
-  const dup = state.orders.find(o => o.no === no && o.id !== id);
-  if(dup){
-    alert(`⚠ 이미 같은 지시번호가 등록되어 있습니다.\n\n지시번호: ${dup.no}\n공사명: ${dup.name||'─'}\n등록자: ${dup.createdBy||'?'}\n\n다른 번호를 사용해주세요.`);
-    return;
+  // 중복 체크 (저장 직전에도 확인) — "미지시"는 예외
+  if(no !== '미지시'){
+    const dup = state.orders.find(o => o.no === no && o.id !== id);
+    if(dup){
+      alert(`⚠ 이미 같은 지시번호가 등록되어 있습니다.\n\n지시번호: ${dup.no}\n공사명: ${dup.name||'─'}\n등록자: ${dup.createdBy||'?'}\n\n다른 번호를 사용해주세요.`);
+      return;
+    }
   }
+
+  const startDate = document.getElementById('fStart').value;
+  const endDate = document.getElementById('fEnd').value;
 
   const data = {
     no, name,
@@ -975,8 +1185,10 @@ document.getElementById('fSave').onclick = async () => {
     bossName: document.getElementById('fBoss').value.trim(),
     bossPhone: document.getElementById('fPhone').value.trim(),
     length: parseFloat(document.getElementById('fLen').value) || 0,
-    startDate: document.getElementById('fStart').value,
-    endDate: document.getElementById('fEnd').value,
+    startDate: startDate,           // 구버전 호환
+    endDate: endDate,               // 구버전 호환
+    plannedDate: startDate,         // 공사예정 단계의 날짜와 동기화
+    completedDate: endDate,         // 공사완료 단계의 날짜와 동기화
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: state.user.name
   };
@@ -1194,7 +1406,13 @@ window.setStage = async function(orderId, newStage){
     const dKey = STAGE_DATE_KEYS[i];
     if(i <= newStage){
       update[key] = true;
-      if(!o[dKey]) update[dKey] = today();
+      if(!o[dKey]){
+        const todayStr = today();
+        update[dKey] = todayStr;
+        // 폼 작업기간 동기화
+        if(dKey === 'plannedDate') update.startDate = todayStr;
+        if(dKey === 'completedDate') update.endDate = todayStr;
+      }
     } else {
       update[key] = false;
       update[dKey] = '';
@@ -1265,12 +1483,16 @@ async function toggleField(id, field, val){
 }
 
 async function updateDate(id, field, val){
+  const update = {
+    [field]: val,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: state.user.name
+  };
+  // 단계 날짜 ↔ 폼 작업기간 동기화
+  if(field === 'plannedDate') update.startDate = val;
+  if(field === 'completedDate') update.endDate = val;
   try{
-    await db.collection('orders').doc(id).update({
-      [field]: val,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedBy: state.user.name
-    });
+    await db.collection('orders').doc(id).update(update);
   }catch(e){
     alert('날짜 저장 실패: ' + e.message);
   }
@@ -1438,6 +1660,11 @@ setTimeout(() => { if(state.user) checkAlerts(); }, 5000);
    12. 엑셀 내보내기 (ExcelJS)
    ============================================================ */
 async function exportToExcel(){
+  // 모바일 차단
+  if(isMobile()){
+    alert('📱 엑셀 내보내기는 PC(관리자)에서만 사용할 수 있습니다.');
+    return;
+  }
   if(typeof ExcelJS === 'undefined'){
     alert('엑셀 라이브러리가 아직 로드 중입니다. 잠시 후 다시 시도해주세요.');
     return;
@@ -1588,7 +1815,149 @@ async function exportToExcel(){
 }
 
 /* ============================================================
-   13. PWA 설치 안내 (아이폰 사용자 대상)
+   13. 관리자 패널
+   ============================================================ */
+document.getElementById('adminBtn').onclick = openAdminPanel;
+
+async function openAdminPanel(){
+  if(state.role !== 'admin'){ alert('관리자 권한이 필요합니다.'); return; }
+
+  // URL 표시 (저장된 값 우선, 없으면 현재 페이지 주소)
+  document.getElementById('adminUrl').value = state.passwords.url || window.location.href;
+  // 현재 비밀번호 표시
+  document.getElementById('adminPwUserCur').textContent = state.passwords.app || APP_PASSWORD;
+  document.getElementById('adminPwUser').value = '';
+  document.getElementById('adminPwAdmin').value = '';
+
+  // 등록된 관리자 PC 목록
+  await loadAdminDevices();
+
+  document.getElementById('adminModal').classList.add('show');
+}
+
+async function loadAdminDevices(){
+  const list = document.getElementById('devList');
+  const count = document.getElementById('devCount');
+  try{
+    const snap = await db.collection('adminDevices').get();
+    count.textContent = `(${snap.size}/2)`;
+    const myDeviceId = getDeviceId();
+    let html = '';
+    snap.forEach(doc => {
+      const d = doc.data();
+      const isMe = doc.id === myDeviceId;
+      const regDate = d.registeredAt?.toDate ? d.registeredAt.toDate().toISOString().slice(0,10).replace(/-/g,'.') : '―';
+      html += `<div class="dev-row ${isMe?'me':''}">
+        <div class="dev-info">
+          <div class="dn">${esc(d.name||'(이름 없음)')}${isMe?'<span class="me-tag">현재 PC</span>':''}</div>
+          <div class="dt">등록일 ${regDate} · ${esc(d.registeredBy||'?')}</div>
+        </div>
+        <button class="dev-rm" onclick="removeAdminDevice('${doc.id}', ${isMe})">제거</button>
+      </div>`;
+    });
+    if(snap.size === 0){
+      html = '<div class="dev-row empty"><div class="dev-info">등록된 관리자 PC가 없습니다.</div></div>';
+    }
+    // 빈 슬롯 표시
+    if(snap.size === 1){
+      html += '<div class="dev-row empty"><div class="dev-info">(2번째 슬롯 비어있음)</div></div>';
+    }
+    list.innerHTML = html;
+  }catch(e){
+    list.innerHTML = `<div style="color:var(--warn-r); font-size:12px; padding:10px">⚠ 디바이스 목록 로드 실패: ${esc(e.message)}</div>`;
+  }
+}
+
+window.removeAdminDevice = async function(deviceId, isMe){
+  const msg = isMe
+    ? '⚠ 현재 PC를 관리자에서 제거하시겠습니까?\n\n제거 후에는 다시 로그아웃 → 로그인해야 하며,\n다른 PC가 이미 1대 등록되어 있다면 새로 등록 가능합니다.'
+    : '이 관리자 PC를 제거하시겠습니까?\n\n제거된 PC에서 다음 로그인 시 관리자 권한을 다시 받아야 합니다.';
+  if(!confirm(msg)) return;
+  try{
+    await db.collection('adminDevices').doc(deviceId).delete();
+    showToast({ title:'✓ 관리자 PC 제거됨' });
+    await loadAdminDevices();
+  }catch(e){
+    alert('제거 실패: ' + e.message);
+  }
+};
+
+window.copyAdminUrl = function(){
+  const inp = document.getElementById('adminUrl');
+  inp.select();
+  inp.setSelectionRange(0, 99999);
+  try{
+    navigator.clipboard.writeText(inp.value).then(() => {
+      showToast({ title:'✓ 주소 복사됨', sub: '직원들에게 붙여넣어 공유하세요' });
+    });
+  }catch(e){
+    document.execCommand('copy');
+    showToast({ title:'✓ 주소 복사됨' });
+  }
+};
+
+window.detectAdminUrl = function(){
+  document.getElementById('adminUrl').value = window.location.href;
+  showToast({ title:'현재 페이지 주소로 변경됨', sub:'저장 버튼을 눌러주세요' });
+};
+
+window.saveAdminUrl = async function(){
+  const url = document.getElementById('adminUrl').value.trim();
+  if(!url){ alert('주소를 입력해주세요.'); return; }
+  try{
+    await db.collection('config').doc('main').set({
+      appUrl: url,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: state.user.name
+    }, { merge: true });
+    state.passwords.url = url;
+    showToast({ title:'✓ 주소 저장됨' });
+  }catch(e){
+    alert('저장 실패: ' + e.message);
+  }
+};
+
+window.saveUserPassword = async function(){
+  const pw = document.getElementById('adminPwUser').value.trim();
+  if(!pw){ alert('새 비밀번호를 입력해주세요.'); return; }
+  if(pw.length < 4){ alert('비밀번호는 4자 이상이어야 합니다.'); return; }
+  if(!confirm(`사용자 비밀번호를 "${pw}" 로 변경하시겠습니까?\n\n변경 후 직원들에게 새 비밀번호를 안내해야 합니다.`)) return;
+  try{
+    await db.collection('config').doc('main').set({
+      appPassword: pw,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: state.user.name
+    }, { merge: true });
+    state.passwords.app = pw;
+    document.getElementById('adminPwUserCur').textContent = pw;
+    document.getElementById('adminPwUser').value = '';
+    showToast({ title:'✓ 사용자 비밀번호 변경됨', sub:`새 비밀번호: ${pw}` });
+  }catch(e){
+    alert('저장 실패: ' + e.message);
+  }
+};
+
+window.saveAdminPassword = async function(){
+  const pw = document.getElementById('adminPwAdmin').value.trim();
+  if(!pw){ alert('새 관리자 비밀번호를 입력해주세요.'); return; }
+  if(pw.length < 6){ alert('관리자 비밀번호는 6자 이상이어야 합니다.'); return; }
+  if(!confirm(`관리자 비밀번호를 변경하시겠습니까?\n\n새 비밀번호: ${pw}\n\n⚠️ 이 비밀번호를 잊으면 관리자 패널에 접근할 수 없습니다.\n별도로 안전하게 보관하세요.`)) return;
+  try{
+    await db.collection('config').doc('main').set({
+      adminPassword: pw,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: state.user.name
+    }, { merge: true });
+    state.passwords.admin = pw;
+    document.getElementById('adminPwAdmin').value = '';
+    showToast({ title:'✓ 관리자 비밀번호 변경됨' });
+  }catch(e){
+    alert('저장 실패: ' + e.message);
+  }
+};
+
+/* ============================================================
+   14. PWA 설치 안내 (아이폰 사용자 대상)
    ============================================================ */
 window.addEventListener('load', () => {
   // 아이폰이고 standalone 모드가 아닐 때만 안내
