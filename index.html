@@ -119,11 +119,13 @@
   .card.alert-위험{border-left:3px solid var(--warn-r)}
   .card-head{display:flex; align-items:flex-start; gap:8px; margin-bottom:6px}
   .card-no{font-family:var(--mono); font-size:12px; font-weight:700; color:var(--accent); background:rgba(16,185,129,.1); padding:3px 8px; border-radius:5px; flex-shrink:0}
-  .card-status{margin-left:auto; font-size:10.5px; padding:3px 7px; border-radius:5px; font-weight:600; flex-shrink:0}
+  .card-status{margin-left:auto; font-size:10.5px; padding:3px 7px; border-radius:5px; font-weight:600; flex-shrink:0; white-space:nowrap}
   .st-등록{background:rgba(148,163,184,.15); color:var(--wait)}
-  .st-진행중{background:rgba(34,211,238,.15); color:#22d3ee}
-  .st-완료{background:rgba(52,211,153,.15); color:var(--done)}
-  .st-경과{background:rgba(239,68,68,.15); color:var(--warn-r)}
+  .st-공사예정{background:rgba(96,165,250,.18); color:#60a5fa}
+  .st-공사중{background:rgba(251,146,60,.18); color:#fb923c}
+  .st-공사완료{background:rgba(34,211,238,.18); color:#22d3ee}
+  .st-측량완료{background:rgba(167,139,250,.18); color:#a78bfa}
+  .st-로딩완료{background:rgba(52,211,153,.2); color:var(--done)}
   .card-name{font-size:13.5px; font-weight:600; color:#fff; line-height:1.35; margin-bottom:4px}
   .card-loc{font-size:11.5px; color:var(--text-dim); line-height:1.45}
   .card-meta{display:flex; gap:10px; margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,.07); font-size:10.5px; color:var(--text-dim)}
@@ -192,6 +194,25 @@
   .toggle-date{font-family:var(--mono); font-size:12px; color:var(--text); background:#0a121e; border:1px solid var(--line); padding:6px 10px; border-radius:6px; min-width:140px; text-align:left; flex-shrink:0; cursor:pointer}
   .toggle-date:disabled{opacity:.4; cursor:not-allowed}
   .toggle-row{flex-wrap:wrap}
+
+  /* ---------- 단계 선택 (공사 진행) ---------- */
+  .stage-row{display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:9px; cursor:pointer; margin-bottom:6px; transition:background .15s; flex-wrap:wrap}
+  .stage-row:hover{background:rgba(255,255,255,.04)}
+  .stage-row.done{background:rgba(52,211,153,.06)}
+  .stage-row.current{background:rgba(16,185,129,.18); border:1px solid var(--accent); padding:10px 11px}
+  .stage-row.disabled{opacity:.45; cursor:not-allowed}
+  .stage-row.disabled:hover{background:none}
+  .stage-marker{width:28px; height:28px; border-radius:50%; background:rgba(255,255,255,.08); color:var(--text-dim); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; flex-shrink:0; font-family:var(--mono)}
+  .stage-row.done .stage-marker{background:var(--done); color:#04231a}
+  .stage-row.current .stage-marker{background:var(--accent); color:#04231a}
+  .stage-label{flex:1; font-size:13px; font-weight:600; color:var(--text); min-width:90px}
+  .stage-row.current .stage-label{color:#fff}
+  .stage-row.disabled .stage-label{color:var(--text-dim)}
+  .stage-note{font-size:10px; color:var(--text-dim); font-weight:500; margin-left:4px; background:rgba(239,68,68,.1); padding:1px 6px; border-radius:4px; color:var(--warn-r)}
+  .stage-date{width:140px; font-family:var(--mono); font-size:12px; color:var(--text); background:#0a121e; border:1px solid var(--line); padding:6px 10px; border-radius:6px; text-align:left; flex-shrink:0; cursor:pointer}
+  .stage-date:disabled{opacity:.3; cursor:not-allowed}
+  .stage-reset{margin-top:8px; background:none; border:1px dashed var(--line); color:var(--text-dim); padding:7px 12px; border-radius:7px; font-size:11.5px; cursor:pointer; width:100%}
+  .stage-reset:hover{color:var(--warn-r); border-color:var(--warn-r)}
 
   .countdown{padding:10px 12px; background:#0e1626; border-radius:8px; margin-top:10px; font-size:12px; display:flex; align-items:center; gap:8px}
   .countdown.lv-주의{background:rgba(250,204,21,.1); color:var(--warn-y)}
@@ -265,6 +286,12 @@
   .tbl tbody tr.alert-주의 td:first-child{border-left:3px solid var(--warn-y)}
   .tbl .t-no{font-family:var(--mono); color:var(--accent); font-weight:700; white-space:nowrap}
   .tbl .t-st{font-size:10.5px; padding:3px 8px; border-radius:5px; display:inline-block; font-weight:600; white-space:nowrap}
+  .tbl .t-st.st-등록{background:rgba(148,163,184,.15); color:var(--wait)}
+  .tbl .t-st.st-공사예정{background:rgba(96,165,250,.18); color:#60a5fa}
+  .tbl .t-st.st-공사중{background:rgba(251,146,60,.18); color:#fb923c}
+  .tbl .t-st.st-공사완료{background:rgba(34,211,238,.18); color:#22d3ee}
+  .tbl .t-st.st-측량완료{background:rgba(167,139,250,.18); color:#a78bfa}
+  .tbl .t-st.st-로딩완료{background:rgba(52,211,153,.2); color:var(--done)}
   .tbl .t-alert{font-family:var(--mono); font-size:11.5px; white-space:nowrap}
   .tbl .t-alert.위험{color:var(--warn-r); font-weight:700}
   .tbl .t-alert.경고{color:var(--warn-o); font-weight:700}
@@ -342,8 +369,11 @@
   <!-- 탭 -->
   <div class="tabs">
     <button data-tab="all" class="on">전체 <span class="cnt" id="cAll">0</span></button>
-    <button data-tab="prog">진행중 <span class="cnt" id="cProg">0</span></button>
-    <button data-tab="done">완료 <span class="cnt" id="cDone">0</span></button>
+    <button data-tab="공사예정">공사예정 <span class="cnt" id="c공사예정">0</span></button>
+    <button data-tab="공사중">공사중 <span class="cnt" id="c공사중">0</span></button>
+    <button data-tab="공사완료">공사완료 <span class="cnt" id="c공사완료">0</span></button>
+    <button data-tab="측량완료">측량완료 <span class="cnt" id="c측량완료">0</span></button>
+    <button data-tab="로딩완료">로딩완료 <span class="cnt" id="c로딩완료">0</span></button>
     <button data-tab="alert" class="tab-alert" id="tabAlert">⚠ 알림 <span class="cnt" id="cAlert">0</span></button>
   </div>
 
@@ -480,7 +510,7 @@ const firebaseConfig = {
 };
 
 /* 접속 비밀번호 — 사업소 내부에서만 공유하세요 ⬇️ 이 부분만 본인이 정한 비밀번호로 바꾸세요 */
-const APP_PASSWORD = "j2026";
+const APP_PASSWORD = "여기에비밀번호입력";
 
 /* ============================================================
    2. 상태 & 유틸
@@ -522,12 +552,24 @@ function alertLevel(order){
   return null;
 }
 
-/* 진행 상태 계산 */
+/* 단계 정의 — 순차적 진행 (1→5) */
+const STAGE_NAMES = ['등록', '공사예정', '공사중', '공사완료', '측량완료', '로딩완료'];
+const STAGE_KEYS = [null, 'planned', 'inProgress', 'completed', 'surveyed', 'loadingDone'];
+const STAGE_DATE_KEYS = [null, 'plannedDate', 'inProgressDate', 'completedDate', 'surveyedDate', 'loadingDoneDate'];
+
+/* 현재 단계 계산 (가장 높은 완료 단계 반환) */
+function getStage(o){
+  if(o.loadingDone) return 5;
+  if(o.surveyed) return 4;
+  if(o.completed) return 3;
+  if(o.inProgress) return 2;
+  if(o.planned) return 1;
+  return 0;
+}
+
+/* 진행 상태 = 현재 단계 이름 */
 function orderStatus(o){
-  if(o.loadingDone) return '완료';
-  if(o.drawingReceived && daysBetween(o.drawingReceivedDate) > 14) return '경과';
-  if(o.planned || o.inProgress || o.completed || o.surveyed || o.drawingReceived) return '진행중';
-  return '등록';
+  return STAGE_NAMES[getStage(o)];
 }
 
 /* ============================================================
@@ -658,27 +700,34 @@ function render(){
   // 자동완성 datalist 업데이트
   updateDatalists();
 
-  // KPI 계산
-  let total = state.orders.length;
-  let prog = 0, done = 0, alerts = 0;
+  // 단계별 카운트 + KPI 계산
+  const stageCounts = [0, 0, 0, 0, 0, 0]; // index = stage (0~5)
+  let alerts = 0;
   const alertList = [];
 
   state.orders.forEach(o => {
-    const st = orderStatus(o);
-    if(st === '완료') done++;
-    if(st === '진행중' || st === '경과') prog++;
+    const s = getStage(o);
+    stageCounts[s]++;
     const al = alertLevel(o);
     if(al){ alerts++; alertList.push({order:o, ...al}); }
   });
+
+  const total = state.orders.length;
+  const prog = stageCounts[1] + stageCounts[2] + stageCounts[3] + stageCounts[4]; // 1~4단계
+  const done = stageCounts[5]; // 로딩완료
 
   document.getElementById('kTotal').textContent = total;
   document.getElementById('kProg').textContent = prog;
   document.getElementById('kDone').textContent = done;
   document.getElementById('kAlert').textContent = alerts;
 
+  // 탭 카운트
   document.getElementById('cAll').textContent = total;
-  document.getElementById('cProg').textContent = prog;
-  document.getElementById('cDone').textContent = done;
+  document.getElementById('c공사예정').textContent = stageCounts[1];
+  document.getElementById('c공사중').textContent = stageCounts[2];
+  document.getElementById('c공사완료').textContent = stageCounts[3];
+  document.getElementById('c측량완료').textContent = stageCounts[4];
+  document.getElementById('c로딩완료').textContent = stageCounts[5];
   document.getElementById('cAlert').textContent = alerts;
 
   const tabAlert = document.getElementById('tabAlert');
@@ -700,11 +749,14 @@ function render(){
     bar.classList.remove('show');
   }
 
-  // 탭 필터링
+  // 탭 필터링 (단계 기반)
+  const TAB_TO_STAGE = {'공사예정':1, '공사중':2, '공사완료':3, '측량완료':4, '로딩완료':5};
   let filtered = state.orders;
-  if(state.currentTab === 'prog') filtered = state.orders.filter(o => ['진행중','경과'].includes(orderStatus(o)));
-  else if(state.currentTab === 'done') filtered = state.orders.filter(o => orderStatus(o) === '완료');
-  else if(state.currentTab === 'alert') filtered = alertList.map(a => a.order);
+  if(state.currentTab in TAB_TO_STAGE){
+    filtered = state.orders.filter(o => getStage(o) === TAB_TO_STAGE[state.currentTab]);
+  } else if(state.currentTab === 'alert'){
+    filtered = alertList.map(a => a.order);
+  }
 
   // 검색 필터링
   if(state.searchQuery){
@@ -785,17 +837,24 @@ function updateDatalists(){
 }
 
 function renderCard(o){
-  const st = orderStatus(o);
+  const stage = getStage(o);
+  const st = STAGE_NAMES[stage]; // 등록/공사예정/공사중/공사완료/측량완료/로딩완료
   const al = alertLevel(o);
   const alClass = al ? `alert-${al.level}` : '';
   const stClass = `st-${st}`;
-  const dots = [
-    o.planned, o.inProgress, o.completed, o.surveyed, o.drawingReceived, o.loadingDone
-  ];
-  const dotsHtml = dots.map((on,i) => {
-    const isDone = i === 5 && on;
-    return `<div class="dot ${on ? (isDone?'done':'on') : ''}" title="${['공사예정','공사중','공사완료','측량완료','준공도인수','로딩완료'][i]}"></div>`;
+
+  // 5개 단계 dots
+  const dotsHtml = [1,2,3,4,5].map(i => {
+    const isDone = i < stage;
+    const isCurrent = i === stage;
+    let cls = '';
+    if(isDone) cls = 'done';
+    else if(isCurrent) cls = 'on';
+    return `<div class="dot ${cls}" title="${STAGE_NAMES[i]}"></div>`;
   }).join('');
+
+  const drawingTag = o.drawingReceived ? `<span style="color:var(--done)">✓ 준공도</span>` : '';
+
   return `<div class="card ${alClass}" onclick="openDetail('${o.id}')">
     <div class="card-head">
       <span class="card-no">${esc(o.no||'')}</span>
@@ -806,6 +865,7 @@ function renderCard(o){
     <div class="card-meta">
       ${o.bossName ? `<span>👤 ${esc(o.bossName)}</span>` : ''}
       ${o.length ? `<span>📏 ${esc(o.length)}m</span>` : ''}
+      ${drawingTag}
       ${al ? `<span style="color:var(--warn-${al.level==='위험'?'r':al.level==='경고'?'o':'y'})">⏱ D+${al.days} (잔여 ${al.daysLeft}일)</span>` : ''}
     </div>
     <div class="card-prog">${dotsHtml}</div>
@@ -993,12 +1053,14 @@ function renderDetail(o){
     </div>
 
     <div class="section">
-      <div class="section-head"><span class="ic">🚧</span> 공사 진행</div>
+      <div class="section-head"><span class="ic">🚧</span> 공사 진행 <span style="margin-left:auto; font-size:11px; color:var(--text-dim); font-weight:500">단계를 눌러 변경</span></div>
       <div class="section-body">
-        ${toggleRow('planned', '공사예정', o.planned, o.plannedDate)}
-        ${toggleRow('inProgress', '공사중', o.inProgress, o.inProgressDate)}
-        ${toggleRow('completed', '공사완료', o.completed, o.completedDate)}
-        ${toggleRow('surveyed', '측량완료', o.surveyed, o.surveyedDate)}
+        ${stageRowHtml(1, '공사예정', o)}
+        ${stageRowHtml(2, '공사중', o)}
+        ${stageRowHtml(3, '공사완료', o)}
+        ${stageRowHtml(4, '측량완료', o)}
+        ${stageRowHtml(5, '로딩완료', o)}
+        ${getStage(o) > 0 ? `<button class="stage-reset" onclick="resetStage('${o.id}')">↺ 단계 초기화 (등록 상태로)</button>` : ''}
       </div>
     </div>
 
@@ -1006,15 +1068,15 @@ function renderDetail(o){
       <div class="section-head"><span class="ic">📐</span> 준공도</div>
       <div class="section-body">
         ${toggleRow('drawingReceived', '준공도 인수', o.drawingReceived, o.drawingReceivedDate)}
+        ${!o.drawingReceived ? '<div style="margin-top:8px; font-size:11px; color:var(--text-dim)">⚠ 준공도 인수가 완료되어야 로딩완료 단계로 진행할 수 있습니다.</div>' : ''}
       </div>
     </div>
 
     <div class="section">
-      <div class="section-head"><span class="ic">🚚</span> 로딩</div>
+      <div class="section-head"><span class="ic">🚚</span> 로딩 마감 관리</div>
       <div class="section-body">
-        ${toggleRow('loadingDone', '로딩 완료', o.loadingDone, o.loadingDoneDate)}
         ${o.loadingDone ? `
-          <div class="field" style="margin-top:10px">
+          <div class="field" style="margin-bottom:10px">
             <label>최종연장 (m)</label>
             <input type="number" step="0.1" id="dFinalLen" value="${o.finalLength||''}" placeholder="최종 시공 연장">
             <button class="btn-ghost" style="margin-top:6px" onclick="saveFinalLen('${o.id}')">최종연장 저장</button>
@@ -1038,7 +1100,25 @@ function renderDetail(o){
     <button class="btn-danger" onclick="deleteCurrent()">이 지시서 삭제</button>
   `;
 
-  // 토글 이벤트 바인딩
+  // 단계 행 클릭 이벤트
+  c.querySelectorAll('.stage-row[data-stage]').forEach(row => {
+    if(row.classList.contains('disabled')) return;
+    row.onclick = (e) => {
+      // 날짜 입력칸 클릭은 무시
+      if(e.target.classList.contains('stage-date')) return;
+      const newStage = parseInt(row.dataset.stage);
+      setStage(o.id, newStage);
+    };
+  });
+  // 단계 날짜 수정 이벤트
+  c.querySelectorAll('.stage-date').forEach(d => {
+    d.onclick = (e) => e.stopPropagation();
+    d.onchange = () => {
+      const stageNum = parseInt(d.dataset.stage);
+      updateDate(o.id, STAGE_DATE_KEYS[stageNum], d.value);
+    };
+  });
+  // 준공도 인수 토글 (기존 유지)
   c.querySelectorAll('.toggle input').forEach(inp => {
     inp.onchange = () => toggleField(o.id, inp.dataset.field, inp.checked);
   });
@@ -1048,6 +1128,32 @@ function renderDetail(o){
   // 채팅 입력 엔터
   const ci = document.getElementById('chatInput');
   if(ci) ci.addEventListener('keydown', e => { if(e.key==='Enter') sendChat(); });
+}
+
+/* 단계 행 HTML 생성 */
+function stageRowHtml(stageNum, label, o){
+  const currentStage = getStage(o);
+  const isDone = stageNum < currentStage;
+  const isCurrent = stageNum === currentStage;
+  const date = o[STAGE_DATE_KEYS[stageNum]] || '';
+
+  // 로딩완료는 준공도 인수 안 되어 있으면 비활성화
+  const isDisabled = (stageNum === 5 && !o.drawingReceived && !isCurrent && !isDone);
+
+  let cls = '';
+  if(isDone) cls = 'done';
+  else if(isCurrent) cls = 'current';
+  if(isDisabled) cls += ' disabled';
+
+  const marker = isDone ? '✓' : stageNum;
+  const dateDisabled = (!isDone && !isCurrent);
+  const note = isDisabled ? '<span class="stage-note">준공도 인수 필요</span>' : '';
+
+  return `<div class="stage-row ${cls}" data-stage="${stageNum}">
+    <div class="stage-marker">${marker}</div>
+    <div class="stage-label">${label}${note}</div>
+    <input type="date" class="stage-date" data-stage="${stageNum}" value="${date}" ${dateDisabled?'disabled':''}>
+  </div>`;
 }
 
 function toggleRow(field, label, checked, date){
@@ -1061,6 +1167,74 @@ function toggleRow(field, label, checked, date){
   </div>`;
 }
 
+/* 단계 설정 — 순차 진행: 누른 단계까지는 완료, 그 이후는 미완료 */
+window.setStage = async function(orderId, newStage){
+  const o = state.orders.find(x => x.id === orderId);
+  if(!o) return;
+
+  // 로딩완료(5단계)는 준공도 인수 필수
+  if(newStage === 5 && !o.drawingReceived){
+    alert('🚫 로딩완료 단계로 진행하려면\n준공도 인수가 먼저 완료되어야 합니다.\n\n준공도 섹션에서 "준공도 인수" 를 먼저 체크해주세요.');
+    return;
+  }
+
+  const currentStage = getStage(o);
+  // 현재 단계를 다시 누르면 한 단계 뒤로
+  if(newStage === currentStage){
+    newStage = currentStage - 1;
+  }
+
+  const update = {
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: state.user.name
+  };
+
+  for(let i = 1; i <= 5; i++){
+    const key = STAGE_KEYS[i];
+    const dKey = STAGE_DATE_KEYS[i];
+    if(i <= newStage){
+      update[key] = true;
+      if(!o[dKey]) update[dKey] = today();
+    } else {
+      update[key] = false;
+      update[dKey] = '';
+    }
+  }
+
+  try{
+    await db.collection('orders').doc(orderId).update(update);
+    setTimeout(() => {
+      const updated = state.orders.find(x => x.id === orderId);
+      if(updated && state.currentDetailId === orderId) renderDetail(updated);
+    }, 300);
+  }catch(e){
+    alert('단계 변경 실패: ' + e.message);
+  }
+};
+
+/* 단계 초기화 — 전부 등록 상태로 */
+window.resetStage = async function(orderId){
+  if(!confirm('모든 진행 단계를 초기화하시겠습니까?\n(등록 상태로 돌아갑니다)')) return;
+  const update = {
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: state.user.name
+  };
+  for(let i = 1; i <= 5; i++){
+    update[STAGE_KEYS[i]] = false;
+    update[STAGE_DATE_KEYS[i]] = '';
+  }
+  try{
+    await db.collection('orders').doc(orderId).update(update);
+    setTimeout(() => {
+      const updated = state.orders.find(x => x.id === orderId);
+      if(updated && state.currentDetailId === orderId) renderDetail(updated);
+    }, 300);
+    showToast({ title:'단계 초기화됨' });
+  }catch(e){
+    alert('초기화 실패: ' + e.message);
+  }
+};
+
 async function toggleField(id, field, val){
   const update = { [field]: val, updatedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedBy: state.user.name };
   if(val){
@@ -1069,9 +1243,18 @@ async function toggleField(id, field, val){
     const dateField = field + 'Date';
     if(!o[dateField]) update[dateField] = today();
   }
+  // 준공도 인수를 끄려는데 로딩완료가 켜져있으면 막기
+  if(field === 'drawingReceived' && !val){
+    const o = state.orders.find(x => x.id === id);
+    if(o.loadingDone){
+      alert('🚫 로딩완료가 체크된 상태에서는\n준공도 인수를 해제할 수 없습니다.\n\n먼저 단계를 측량완료로 되돌려주세요.');
+      const updated = state.orders.find(x => x.id === id);
+      if(updated && state.currentDetailId === id) renderDetail(updated);
+      return;
+    }
+  }
   try{
     await db.collection('orders').doc(id).update(update);
-    // 화면 갱신은 onSnapshot이 처리
     setTimeout(() => {
       const o = state.orders.find(x => x.id === id);
       if(o && state.currentDetailId === id) renderDetail(o);
@@ -1353,10 +1536,12 @@ async function exportToExcel(){
       // 상태별 색깔
       const st = orderStatus(o);
       const stCell = row.getCell(12);
-      if(st === '완료')   stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF059669'} };
-      if(st === '경과')   stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FFDC2626'} };
-      if(st === '진행중') stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF2563EB'} };
-      if(st === '등록')   stCell.font = { name:'맑은 고딕', size:10.5, color:{argb:'FF6B7280'} };
+      if(st === '로딩완료')      stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF059669'} };
+      else if(st === '측량완료') stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF7C3AED'} };
+      else if(st === '공사완료') stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF0891B2'} };
+      else if(st === '공사중')   stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FFEA580C'} };
+      else if(st === '공사예정') stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF2563EB'} };
+      else                        stCell.font = { name:'맑은 고딕', size:10.5, color:{argb:'FF6B7280'} };
 
       // 지시번호는 진한 녹색
       row.getCell(1).font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF065F46'} };
