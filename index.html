@@ -320,6 +320,26 @@
     .list{grid-template-columns:repeat(auto-fill,minmax(380px,1fr))}
   }
 
+  /* ---------- 간단보기 (compact) ---------- */
+  .list.compact-mode{display:flex; flex-direction:column; gap:5px}
+  .list.compact-mode .compact-row{display:flex; align-items:center; gap:10px; padding:11px 14px; background:var(--ink2); border:1px solid var(--line); border-radius:8px; cursor:pointer; position:relative; transition:background .12s}
+  .list.compact-mode .compact-row:active,
+  .list.compact-mode .compact-row:hover{background:#1a2638}
+  .list.compact-mode .compact-row.alert-위험{border-left:3px solid var(--warn-r)}
+  .list.compact-mode .compact-row.alert-경고{border-left:3px solid var(--warn-o)}
+  .list.compact-mode .compact-row.alert-주의{border-left:3px solid var(--warn-y)}
+  .list.compact-mode .compact-no{font-family:var(--mono); font-weight:700; color:var(--accent); font-size:15px; flex-shrink:0; min-width:90px}
+  .list.compact-mode .compact-name{flex:1; font-size:12px; color:var(--text-dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .list.compact-mode .compact-status{font-size:10.5px; padding:3px 8px; border-radius:5px; font-weight:600; flex-shrink:0}
+  .list.compact-mode .compact-alert{font-family:var(--mono); font-size:11px; font-weight:700; flex-shrink:0}
+  .list.compact-mode .compact-alert.위험{color:var(--warn-r)}
+  .list.compact-mode .compact-alert.경고{color:var(--warn-o)}
+  .list.compact-mode .compact-alert.주의{color:var(--warn-y)}
+
+  @media (min-width: 768px){
+    .list.compact-mode{display:grid; grid-template-columns:repeat(auto-fill,minmax(420px,1fr)); gap:6px}
+  }
+
   /* 모바일에서 엑셀 버튼 숨김 (관리자만 사용) */
   @media (max-width: 767px){
     .tool-btn.export{display:none !important}
@@ -409,6 +429,7 @@
       <input type="search" class="search" id="searchInp" placeholder="지시번호·공사명·위치·소장명 검색..." autocomplete="off">
     </div>
     <button class="tool-btn btn-view on" data-view="card">📋 카드</button>
+    <button class="tool-btn btn-view" data-view="compact">📜 간단</button>
     <button class="tool-btn btn-view" data-view="table">📊 표</button>
     <button class="tool-btn export" id="btnExport">📥 엑셀</button>
   </div>
@@ -461,7 +482,7 @@
       <input type="hidden" id="fId">
       <div class="field">
         <label>지시번호<span class="req">*</span></label>
-        <input id="fNo" placeholder="예: 중부/001" autocomplete="off">
+        <input id="fNo" placeholder="예: 001 (자동으로 접두어 추가) / 또는 미지시" autocomplete="off">
         <div class="field-warn" id="fNoWarn"></div>
       </div>
       <div class="field">
@@ -552,6 +573,20 @@
         </div>
       </div>
 
+      <!-- 지시번호 접두어 -->
+      <div class="admin-card">
+        <div class="admin-card-head">🏷️ 지시번호 접두어</div>
+        <div class="admin-card-body">
+          <input id="adminPrefix" type="text" placeholder="예: 중부, 동부, 강동..." autocomplete="off" maxlength="10">
+          <button class="btn-primary" style="margin-top:8px" onclick="savePrefix()">💾 접두어 변경</button>
+          <div style="font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5">
+            현재 접두어: <code style="font-family:var(--mono); color:var(--accent)" id="adminPrefixCur">―</code><br>
+            💡 사용자가 지시번호에 숫자만 입력해도 (예: <code>001</code>) 이 접두어가 자동으로 붙습니다 (→ <code>중부001</code>).<br>
+            💡 변경 후 기존 데이터는 그대로 유지되고, 신규 등록부터 새 접두어가 적용됩니다.
+          </div>
+        </div>
+      </div>
+
       <!-- 관리자 비밀번호 -->
       <div class="admin-card">
         <div class="admin-card-head">🔐 관리자 비밀번호</div>
@@ -621,7 +656,8 @@ const state = {
   searchQuery: '',          // 검색어
   viewMode: 'card',         // 'card' | 'table'
   configLoaded: false,
-  passwords: { app: null, admin: null, url: null }
+  passwords: { app: null, admin: null, url: null },
+  prefix: '중부'              // 지시번호 자동 접두어 (관리자가 변경 가능)
 };
 
 /* 기본 비밀번호 (Firestore에 저장된 값이 있으면 그게 우선) */
@@ -797,6 +833,7 @@ async function loadConfig(){
       state.passwords.app = d.appPassword || null;
       state.passwords.admin = d.adminPassword || null;
       state.passwords.url = d.appUrl || null;
+      if(d.noPrefix) state.prefix = d.noPrefix;
     }
   }catch(e){
     console.warn('설정 로드 실패 (기본값 사용):', e.message);
@@ -977,13 +1014,42 @@ function render(){
   // 보기 모드에 따라 분기
   if(state.viewMode === 'table'){
     renderTable(filtered);
+  } else if(state.viewMode === 'compact'){
+    renderCompactList(filtered);
   } else {
     renderCardList(filtered);
   }
 }
 
+function renderCompactList(filtered){
+  const listEl = document.getElementById('list');
+  listEl.classList.add('compact-mode');
+  if(!filtered.length){
+    listEl.innerHTML = `<div class="empty">
+      <div class="ic">${state.currentTab==='alert' ? '✅' : (state.searchQuery ? '🔍' : '📋')}</div>
+      ${state.searchQuery ? '검색 결과가 없습니다.' :
+        state.currentTab==='alert' ? '경과 임박한 지시서가 없습니다.' :
+        '등록된 공사지시가 없습니다.'}
+    </div>`;
+    return;
+  }
+  listEl.innerHTML = filtered.map(o => {
+    const stage = getStage(o);
+    const st = STAGE_NAMES[stage];
+    const al = alertLevel(o);
+    const alClass = al ? `alert-${al.level}` : '';
+    return `<div class="compact-row ${alClass}" onclick="openDetail('${o.id}')">
+      <span class="compact-no">${esc(o.no||'')}</span>
+      <span class="compact-name">${esc(o.name||'(공사명 없음)')}</span>
+      <span class="compact-status st-${st}">${st}</span>
+      ${al ? `<span class="compact-alert ${al.level}">D+${al.days}</span>` : ''}
+    </div>`;
+  }).join('');
+}
+
 function renderCardList(filtered){
   const listEl = document.getElementById('list');
+  listEl.classList.remove('compact-mode');
   if(!filtered.length){
     listEl.innerHTML = `<div class="empty" style="grid-column:1/-1">
       <div class="ic">${state.currentTab==='alert' ? '✅' : (state.searchQuery ? '🔍' : '📋')}</div>
@@ -1092,14 +1158,16 @@ document.getElementById('searchInp').addEventListener('input', (e) => {
   render();
 });
 
-/* 보기 모드 (카드 / 표) */
+/* 보기 모드 (카드 / 간단 / 표) */
 document.querySelectorAll('.btn-view').forEach(b => {
   b.onclick = () => {
     document.querySelectorAll('.btn-view').forEach(x => x.classList.remove('on'));
     b.classList.add('on');
     state.viewMode = b.dataset.view;
-    document.getElementById('list').classList.toggle('hide', state.viewMode === 'table');
-    document.getElementById('tableView').classList.toggle('on', state.viewMode === 'table');
+    const isTable = state.viewMode === 'table';
+    document.getElementById('list').classList.toggle('hide', isTable);
+    document.getElementById('tableView').classList.toggle('on', isTable);
+    if(!isTable) document.getElementById('list').classList.toggle('compact-mode', state.viewMode === 'compact');
     render();
   };
 });
@@ -1145,12 +1213,31 @@ document.getElementById('fNo').addEventListener('input', () => {
   if(!no){ warn.classList.remove('show'); return; }
   // "미지시"는 중복 허용
   if(no === '미지시'){ warn.classList.remove('show'); return; }
-  const dup = state.orders.find(o => o.no === no && o.id !== editId);
+  // 정확한 매칭 + 트림된 값으로 비교 (방어적)
+  const dup = state.orders.find(o => (o.no||'').trim() === no && o.id !== editId);
   if(dup){
     warn.innerHTML = `⚠ <strong>이미 등록된 지시번호입니다.</strong><br>「${esc(dup.name||'─')}」 (${esc(dup.createdBy||'?')} 등록)`;
     warn.classList.add('show');
   } else {
     warn.classList.remove('show');
+  }
+});
+
+/* 지시번호 자동 접두어 (입력칸에서 떠나면 적용) */
+document.getElementById('fNo').addEventListener('blur', () => {
+  const inp = document.getElementById('fNo');
+  const val = inp.value.trim();
+  if(!val) return;
+  const prefix = state.prefix || '중부';
+  // "미지시"는 예외
+  if(val === '미지시') return;
+  // 이미 접두어 포함되어 있으면 그대로
+  if(val.startsWith(prefix)) return;
+  // 숫자만 입력했으면 접두어 추가 (예: "001" → "중부001")
+  if(/^\d+$/.test(val)){
+    inp.value = prefix + val;
+    // 중복 체크 재실행
+    inp.dispatchEvent(new Event('input'));
   }
 });
 
@@ -1165,14 +1252,21 @@ document.getElementById('fBoss').addEventListener('change', () => {
 
 document.getElementById('fSave').onclick = async () => {
   const id = document.getElementById('fId').value;
-  const no = document.getElementById('fNo').value.trim();
+  let no = document.getElementById('fNo').value.trim();
   const name = document.getElementById('fName').value.trim();
   if(!no){ alert('지시번호를 입력해주세요.'); return; }
   if(!name){ alert('공사명을 입력해주세요.'); return; }
 
+  // 저장 직전에도 접두어 적용 (blur 안 일어났을 경우 대비)
+  const prefix = state.prefix || '중부';
+  if(no !== '미지시' && !no.startsWith(prefix) && /^\d+$/.test(no)){
+    no = prefix + no;
+    document.getElementById('fNo').value = no;
+  }
+
   // 중복 체크 (저장 직전에도 확인) — "미지시"는 예외
   if(no !== '미지시'){
-    const dup = state.orders.find(o => o.no === no && o.id !== id);
+    const dup = state.orders.find(o => (o.no||'').trim() === no && o.id !== id);
     if(dup){
       alert(`⚠ 이미 같은 지시번호가 등록되어 있습니다.\n\n지시번호: ${dup.no}\n공사명: ${dup.name||'─'}\n등록자: ${dup.createdBy||'?'}\n\n다른 번호를 사용해주세요.`);
       return;
@@ -1864,6 +1958,9 @@ async function openAdminPanel(){
   document.getElementById('adminPwUserCur').textContent = state.passwords.app || APP_PASSWORD;
   document.getElementById('adminPwUser').value = '';
   document.getElementById('adminPwAdmin').value = '';
+  // 현재 접두어
+  document.getElementById('adminPrefixCur').textContent = state.prefix || '중부';
+  document.getElementById('adminPrefix').value = '';
 
   // 등록된 관리자 PC 목록
   await loadAdminDevices();
@@ -1987,6 +2084,26 @@ window.saveAdminPassword = async function(){
     state.passwords.admin = pw;
     document.getElementById('adminPwAdmin').value = '';
     showToast({ title:'✓ 관리자 비밀번호 변경됨' });
+  }catch(e){
+    alert('저장 실패: ' + e.message);
+  }
+};
+
+window.savePrefix = async function(){
+  const pfx = document.getElementById('adminPrefix').value.trim();
+  if(!pfx){ alert('새 접두어를 입력해주세요.'); return; }
+  if(pfx.length > 10){ alert('접두어는 10자 이내로 입력해주세요.'); return; }
+  if(!confirm(`지시번호 접두어를 "${pfx}" 로 변경하시겠습니까?\n\n예: "001" 입력시 → "${pfx}001" 로 자동 변환됩니다.\n\n※ 기존에 등록된 데이터는 그대로 유지되며, 신규 등록부터 적용됩니다.`)) return;
+  try{
+    await db.collection('config').doc('main').set({
+      noPrefix: pfx,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: state.user.name
+    }, { merge: true });
+    state.prefix = pfx;
+    document.getElementById('adminPrefixCur').textContent = pfx;
+    document.getElementById('adminPrefix').value = '';
+    showToast({ title:'✓ 접두어 변경됨', sub:`이제 "001" → "${pfx}001"` });
   }catch(e){
     alert('저장 실패: ' + e.message);
   }
