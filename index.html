@@ -350,6 +350,9 @@
     .tool-btn.export{display:none !important}
   }
 
+  /* 제작자 크레딧 */
+  .credit{position:fixed; bottom:4px; right:10px; font-family:var(--mono); font-size:9px; color:var(--text-dim); opacity:.5; z-index:50; pointer-events:none; letter-spacing:.5px; text-shadow:0 0 4px rgba(13,17,23,.7)}
+
   /* ---------- 관리자 패널 카드 ---------- */
   .admin-card{background:var(--ink2); border:1px solid var(--line); border-radius:11px; overflow:hidden; margin-bottom:14px}
   .admin-card-head{padding:11px 14px; background:#0e1626; border-bottom:1px solid var(--line); font-size:13px; font-weight:700; color:var(--text); display:flex; align-items:center; gap:8px}
@@ -475,6 +478,9 @@
 <datalist id="dlPhone"></datalist>
 <datalist id="dlProject"></datalist>
 <datalist id="dlLocation"></datalist>
+
+<!-- 제작자 크레딧 -->
+<div class="credit">© Seo Young Min</div>
 
 <!-- ============== 신규/수정 모달 ============== -->
 <div class="modal" id="formModal">
