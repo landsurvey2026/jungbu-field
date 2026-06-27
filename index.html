@@ -581,7 +581,7 @@
           <button class="btn-primary" style="margin-top:8px" onclick="savePrefix()">💾 접두어 변경</button>
           <div style="font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5">
             현재 접두어: <code style="font-family:var(--mono); color:var(--accent)" id="adminPrefixCur">―</code><br>
-            💡 사용자가 지시번호에 숫자만 입력해도 (예: <code>001</code>) 이 접두어가 자동으로 붙습니다 (→ <code>중부001</code>).<br>
+            💡 사용자가 지시번호에 숫자만 입력해도 (예: <code>001</code>) 이 접두어가 자동으로 붙습니다 (→ <code id="prefixExample">중부001</code>).<br>
             💡 변경 후 기존 데이터는 그대로 유지되고, 신규 등록부터 새 접두어가 적용됩니다.
           </div>
         </div>
@@ -676,6 +676,64 @@ function getDeviceId(){
     localStorage.setItem('jungbu_device_id', id);
   }
   return id;
+}
+
+/* 현재 사업소 이름 ("중부수도사업소", "강동수도사업소" 등) */
+function siteName(){
+  return (state.prefix || '중부') + '수도사업소';
+}
+function siteShortName(){
+  return (state.prefix || '중부') + ' 현장관리';
+}
+
+/* 접두어 변경 시 화면 전체 브랜딩 업데이트 */
+function applyBranding(){
+  const sname = siteName();
+  const sshort = siteShortName();
+  const prefix = state.prefix || '중부';
+
+  // 문서 타이틀
+  document.title = `서울시 상수도 현장관리 (${sname})`;
+
+  // 로그인 화면
+  const gateH1 = document.querySelector('#gate h1');
+  if(gateH1) gateH1.textContent = sname;
+
+  // 메인 헤더 (사업소 이름 부분)
+  const headerSub = document.querySelector('.h-title .sub');
+  if(headerSub) headerSub.textContent = sname;
+
+  // 신규 등록 안내 박스 안 예시
+  const prefixExample = document.getElementById('prefixExample');
+  if(prefixExample) prefixExample.textContent = prefix + '001';
+
+  // 관리자 패널의 현재 접두어 표시
+  const prefixCur = document.getElementById('adminPrefixCur');
+  if(prefixCur) prefixCur.textContent = prefix;
+
+  // Apple 메타 (PWA 타이틀)
+  const appleMeta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+  if(appleMeta) appleMeta.setAttribute('content', sshort);
+
+  // PWA manifest 동적 교체 (신규 설치시 반영)
+  try{
+    const manifestData = {
+      name: sname + ' 현장관리',
+      short_name: sshort,
+      start_url: '.',
+      scope: '.',
+      display: 'standalone',
+      orientation: 'portrait',
+      background_color: '#0d1117',
+      theme_color: '#0d1117'
+    };
+    const blob = new Blob([JSON.stringify(manifestData)], {type:'application/manifest+json'});
+    const url = URL.createObjectURL(blob);
+    const link = document.querySelector('link[rel="manifest"]');
+    if(link) link.href = url;
+  }catch(e){
+    console.warn('manifest update skipped', e);
+  }
 }
 
 const today = () => {
@@ -804,6 +862,7 @@ function doLogin(){
       document.getElementById('gate').style.display = 'none';
       document.getElementById('app').style.display = 'flex';
       document.getElementById('hWho').textContent = name + (role === 'admin' ? ' 님 🔐' : ' 님');
+      applyBranding();
 
       // 관리자 UI 표시
       if(role === 'admin'){
@@ -873,10 +932,20 @@ async function checkAdminDevice(name){
   }
 }
 
-// 저장된 이름 자동 입력
-window.addEventListener('load', () => {
+// 저장된 이름 자동 입력 + 초기 브랜딩 적용
+window.addEventListener('load', async () => {
   const saved = localStorage.getItem('jungbu_name');
   if(saved) document.getElementById('gName').value = saved;
+  // Firebase 미리 초기화 → 설정값 로드 → 브랜딩 적용 (로그인 전에도 사업소 이름 정확히 표시)
+  if(initFirebase()){
+    try{
+      await auth.signInAnonymously();
+      await loadConfig();
+      applyBranding();
+    }catch(e){
+      console.warn('초기 설정 로드 실패 (로그인 시 다시 시도):', e.message);
+    }
+  }
 });
 
 /* ============================================================
@@ -1709,7 +1778,7 @@ document.getElementById('permBtn').onclick = async () => {
   const p = await Notification.requestPermission();
   if(p === 'granted'){
     document.getElementById('permBanner').classList.remove('show');
-    new Notification('중부수도사업소', { body: '알림이 활성화되었습니다.' });
+    new Notification(siteName(), { body: '알림이 활성화되었습니다.' });
   }
 };
 
@@ -1781,8 +1850,9 @@ async function exportToExcel(){
   }
 
   try{
+    const sname = siteName();
     const wb = new ExcelJS.Workbook();
-    wb.creator = '중부수도사업소';
+    wb.creator = sname;
     wb.created = new Date();
     const ws = wb.addWorksheet('공사지시 현황', {
       properties:{ defaultRowHeight: 22 },
@@ -1792,7 +1862,7 @@ async function exportToExcel(){
     // ============= 제목 (병합 + 큰 글씨) =============
     ws.mergeCells('A1:L1');
     const titleCell = ws.getCell('A1');
-    titleCell.value = '서울시 중부수도사업소 공사지시 현황';
+    titleCell.value = `서울시 ${sname} 공사지시 현황`;
     titleCell.font = { name:'맑은 고딕', size:16, bold:true, color:{argb:'FF0D1117'} };
     titleCell.alignment = { horizontal:'center', vertical:'middle' };
     titleCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD1FAE5'} };
@@ -1897,7 +1967,7 @@ async function exportToExcel(){
     const lastRow = 5 + state.orders.length + 1;
     ws.mergeCells(`A${lastRow}:L${lastRow}`);
     const footCell = ws.getCell(`A${lastRow}`);
-    footCell.value = `※ 본 자료는 ${dStr} 시점의 현장관리 시스템 데이터입니다. (서울시 중부수도사업소)`;
+    footCell.value = `※ 본 자료는 ${dStr} 시점의 현장관리 시스템 데이터입니다. (서울시 ${sname})`;
     footCell.font = { name:'맑은 고딕', size:9, italic:true, color:{argb:'FF999999'} };
     footCell.alignment = { horizontal:'center' };
 
@@ -1907,7 +1977,7 @@ async function exportToExcel(){
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `중부수도사업소_공사지시현황_${dStr.replace(/\./g,'')}.xlsx`;
+    a.download = `${sname}_공사지시현황_${dStr.replace(/\./g,'')}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2110,9 +2180,9 @@ window.savePrefix = async function(){
       updatedBy: state.user.name
     }, { merge: true });
     state.prefix = pfx;
-    document.getElementById('adminPrefixCur').textContent = pfx;
+    applyBranding();   // 화면 전체 사업소 이름 갱신
     document.getElementById('adminPrefix').value = '';
-    showToast({ title:'✓ 접두어 변경됨', sub:`이제 "001" → "${pfx}001"` });
+    showToast({ title:'✓ 접두어 변경됨', sub:`이제 "001" → "${pfx}001" / ${siteName()}` });
   }catch(e){
     alert('저장 실패: ' + e.message);
   }
