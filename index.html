@@ -372,7 +372,10 @@
       <div class="h-user">
         <div class="who" id="hWho">―</div>
         <div style="font-size:10px; color:var(--text-dim)"><span class="sync-dot off" id="syncDot"></span><span id="syncTxt">연결 중...</span></div>
-        <button id="adminBtn" style="display:none; margin-top:6px; background:var(--accent-dim); color:#d1fae5; border:1px solid var(--accent); padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer">⚙️ 관리자</button>
+        <div style="display:flex; gap:5px; margin-top:6px; justify-content:flex-end">
+          <button id="adminBtn" style="display:none; background:var(--accent-dim); color:#d1fae5; border:1px solid var(--accent); padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer">⚙️ 관리자</button>
+          <button id="logoutBtn" style="background:none; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer" title="로그아웃">⏻ 로그아웃</button>
+        </div>
       </div>
     </div>
     <div class="kpis">
@@ -599,7 +602,7 @@ const firebaseConfig = {
 };
 
 /* 접속 비밀번호 — 사업소 내부에서만 공유하세요 ⬇️ 이 부분만 본인이 정한 비밀번호로 바꾸세요 */
-const APP_PASSWORD = "j2026";
+const APP_PASSWORD = "여기에비밀번호입력";
 
 /* ============================================================
    2. 상태 & 유틸
@@ -1818,6 +1821,39 @@ async function exportToExcel(){
    13. 관리자 패널
    ============================================================ */
 document.getElementById('adminBtn').onclick = openAdminPanel;
+document.getElementById('logoutBtn').onclick = doLogout;
+
+async function doLogout(){
+  if(!confirm('로그아웃 하시겠습니까?')) return;
+  try{
+    // 구독 해제
+    if(state.unsub){ state.unsub(); state.unsub = null; }
+    if(state.unsubChat){ state.unsubChat(); state.unsubChat = null; }
+    // Firebase 로그아웃
+    if(auth) await auth.signOut();
+    // 상태 초기화
+    state.user = null;
+    state.role = null;
+    state.orders = [];
+    state.initialLoad = true;
+    state.lastKnownIds = new Set();
+    state.currentDetailId = null;
+    state.searchQuery = '';
+    state.currentTab = 'all';
+    // UI 초기화
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('gate').style.display = 'flex';
+    document.getElementById('gPw').value = '';
+    document.getElementById('gErr').textContent = '';
+    document.getElementById('adminBtn').style.display = 'none';
+    document.getElementById('adminModal').classList.remove('show');
+    document.getElementById('detailModal').classList.remove('show');
+    document.getElementById('formModal').classList.remove('show');
+    document.getElementById('searchInp').value = '';
+  }catch(e){
+    alert('로그아웃 실패: ' + e.message);
+  }
+}
 
 async function openAdminPanel(){
   if(state.role !== 'admin'){ alert('관리자 권한이 필요합니다.'); return; }
