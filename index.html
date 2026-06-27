@@ -513,15 +513,9 @@
         <label>공사연장 (m)</label>
         <input id="fLen" type="number" step="0.1" placeholder="예: 120.5" autocomplete="off">
       </div>
-      <div class="field-row">
-        <div class="field">
-          <label>공사 예정일 <span style="color:var(--text-dim); font-weight:400; font-size:10.5px">(=공사예정 단계 날짜)</span></label>
-          <input id="fStart" type="date" autocomplete="off">
-        </div>
-        <div class="field">
-          <label>공사 완료일 <span style="color:var(--text-dim); font-weight:400; font-size:10.5px">(=공사완료 단계 날짜)</span></label>
-          <input id="fEnd" type="date" autocomplete="off">
-        </div>
+      <div style="background:rgba(16,185,129,.06); border:1px solid rgba(16,185,129,.2); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:11.5px; color:var(--text-dim); line-height:1.6">
+        💡 <strong style="color:var(--accent)">작업기간(공사예정일·공사완료일)</strong>은 상세보기의 <strong style="color:var(--accent)">공사 진행</strong> 단계에서 입력합니다.<br>
+        여기서는 기본정보만 등록하세요.
       </div>
       <button class="btn-primary" id="fSave">저장</button>
       <button class="btn-ghost" data-close="formModal">취소</button>
@@ -1080,7 +1074,9 @@ function renderTable(filtered){
     const st = orderStatus(o);
     const al = alertLevel(o);
     const alClass = al ? `alert-${al.level}` : '';
-    const period = o.startDate ? fmtDate(o.startDate)+' ~ '+(o.endDate?fmtDate(o.endDate):'─') : '─';
+    const ps = o.plannedDate || o.startDate || '';
+    const pe = o.completedDate || o.endDate || '';
+    const period = ps ? fmtDate(ps)+' ~ '+(pe?fmtDate(pe):'─') : '─';
     const alertCell = al ? `<span class="t-alert ${al.level}">${al.level} D+${al.days} (잔여 ${al.daysLeft}일)</span>` :
                       (o.loadingDone ? '<span style="color:var(--done)">✓ 완료</span>' : '<span style="color:var(--text-dim)">─</span>');
     return `<tr class="${alClass}" onclick="openDetail('${o.id}')">
@@ -1203,10 +1199,6 @@ function openForm(order){
   document.getElementById('fBoss').value = order?.bossName || '';
   document.getElementById('fPhone').value = order?.bossPhone || '';
   document.getElementById('fLen').value = order?.length || '';
-  // 공사예정일 = plannedDate (구버전 호환: startDate fallback)
-  document.getElementById('fStart').value = order?.plannedDate || order?.startDate || '';
-  // 공사완료일 = completedDate (구버전 호환: endDate fallback)
-  document.getElementById('fEnd').value = order?.completedDate || order?.endDate || '';
   document.getElementById('fNoWarn').classList.remove('show');
   document.getElementById('fNoPreview').style.display = 'none';
   document.getElementById('formModal').classList.add('show');
@@ -1290,19 +1282,12 @@ document.getElementById('fSave').onclick = async () => {
     }
   }
 
-  const startDate = document.getElementById('fStart').value;
-  const endDate = document.getElementById('fEnd').value;
-
   const data = {
     no, name,
     location: document.getElementById('fLoc').value.trim(),
     bossName: document.getElementById('fBoss').value.trim(),
     bossPhone: document.getElementById('fPhone').value.trim(),
     length: parseFloat(document.getElementById('fLen').value) || 0,
-    startDate: startDate,           // 구버전 호환
-    endDate: endDate,               // 구버전 호환
-    plannedDate: startDate,         // 공사예정 단계의 날짜와 동기화
-    completedDate: endDate,         // 공사완료 단계의 날짜와 동기화
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: state.user.name
   };
@@ -1361,6 +1346,13 @@ function renderDetail(o){
     </div>`;
   }
 
+  // 작업기간: 공사예정~공사완료 날짜로 자동 표시
+  const periodStart = o.plannedDate || o.startDate || '';
+  const periodEnd = o.completedDate || o.endDate || '';
+  const periodStr = periodStart
+    ? `${fmtDate(periodStart)} ~ ${periodEnd ? fmtDate(periodEnd) : '진행 중'}`
+    : '―';
+
   const c = document.getElementById('detailContent');
   c.innerHTML = `
     <div class="detail-no">${esc(o.no||'')}</div>
@@ -1373,7 +1365,7 @@ function renderDetail(o){
         <div class="info-row"><div class="k">소장</div><div class="v">${esc(o.bossName||'―')}</div></div>
         <div class="info-row"><div class="k">전화번호</div><div class="v">${phoneLink}</div></div>
         <div class="info-row"><div class="k">공사연장</div><div class="v">${o.length ? esc(o.length)+' m' : '―'}</div></div>
-        <div class="info-row"><div class="k">작업기간</div><div class="v">${o.startDate ? fmtDate(o.startDate)+' ~ '+fmtDate(o.endDate) : '―'}</div></div>
+        <div class="info-row"><div class="k">작업기간</div><div class="v">${periodStr}</div></div>
         <div class="info-row"><div class="k">등록자</div><div class="v">${esc(o.createdBy||'―')}</div></div>
       </div>
     </div>
@@ -1820,7 +1812,7 @@ async function exportToExcel(){
     ws.getRow(3).height = 8;
 
     // ============= 헤더 =============
-    const headers = ['지시번호','공사명','공사위치','소장명','전화번호','공사연장(m)','작업시작','작업종료','준공도 인수일','로딩 완료일','최종연장(m)','진행상태'];
+    const headers = ['지시번호','공사명','공사위치','소장명','전화번호','공사연장(m)','공사예정일','공사완료일','준공도 인수일','로딩 완료일','최종연장(m)','진행상태'];
     const headerRow = ws.getRow(4);
     headerRow.values = headers;
     headerRow.height = 28;
@@ -1847,8 +1839,8 @@ async function exportToExcel(){
         o.bossName || '',
         o.bossPhone || '',
         o.length || '',
-        fmtD(o.startDate),
-        fmtD(o.endDate),
+        fmtD(o.plannedDate || o.startDate),
+        fmtD(o.completedDate || o.endDate),
         fmtD(o.drawingReceivedDate),
         fmtD(o.loadingDoneDate),
         o.finalLength || '',
