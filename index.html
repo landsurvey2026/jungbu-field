@@ -266,7 +266,13 @@
   .tool-btn.on{background:var(--accent); border-color:var(--accent); color:#04231a}
   .tool-btn.export{color:var(--accent); border-color:var(--accent-dim)}
   .tool-btn.export:active{background:var(--accent-dim)}
-  .btn-view{display:none}
+  .btn-view{display:inline-block}
+
+  /* 모바일에서는 "표" 버튼만 숨김 (테이블은 가로 스크롤 필요해서 모바일 부적합) */
+  @media (max-width: 767px){
+    .btn-view[data-view="table"]{display:none}
+    .tool-btn{padding:7px 9px; font-size:11px}
+  }
 
   /* ---------- 폼 경고 ---------- */
   .field-warn{margin-top:6px; font-size:11.5px; color:var(--warn-r); display:none; padding:6px 10px; background:rgba(239,68,68,.1); border-radius:6px; border:1px solid rgba(239,68,68,.3)}
@@ -307,7 +313,6 @@
     .kpi .v{font-size:22px}
     .tabs{padding:12px 24px}
     .toolbar{padding:10px 24px}
-    .btn-view{display:inline-block}
     .list{padding:14px 24px 90px; display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:10px; align-content:start}
     .list.hide{display:none}
     .card{margin-bottom:0}
@@ -483,6 +488,7 @@
       <div class="field">
         <label>지시번호<span class="req">*</span></label>
         <input id="fNo" placeholder="예: 001 (자동으로 접두어 추가) / 또는 미지시" autocomplete="off">
+        <div id="fNoPreview" style="display:none; margin-top:6px; font-size:11.5px; color:var(--accent); padding:6px 10px; background:rgba(16,185,129,.08); border-radius:6px; border:1px solid rgba(16,185,129,.3); font-family:var(--mono)"></div>
         <div class="field-warn" id="fNoWarn"></div>
       </div>
       <div class="field">
@@ -637,7 +643,7 @@ const firebaseConfig = {
 };
 
 /* 접속 비밀번호 — 사업소 내부에서만 공유하세요 ⬇️ 이 부분만 본인이 정한 비밀번호로 바꾸세요 */
-const APP_PASSWORD = "j2026";
+const APP_PASSWORD = "여기에비밀번호입력";
 
 /* ============================================================
    2. 상태 & 유틸
@@ -661,7 +667,7 @@ const state = {
 };
 
 /* 기본 비밀번호 (Firestore에 저장된 값이 있으면 그게 우선) */
-const DEFAULT_ADMIN_PASSWORD = "!2026";
+const DEFAULT_ADMIN_PASSWORD = "관리자2026";
 
 /* 모바일 감지 */
 function isMobile(){
@@ -1202,19 +1208,33 @@ function openForm(order){
   // 공사완료일 = completedDate (구버전 호환: endDate fallback)
   document.getElementById('fEnd').value = order?.completedDate || order?.endDate || '';
   document.getElementById('fNoWarn').classList.remove('show');
+  document.getElementById('fNoPreview').style.display = 'none';
   document.getElementById('formModal').classList.add('show');
 }
 
-/* 지시번호 실시간 중복 체크 */
+/* 지시번호 실시간 중복 체크 + 라이브 프리뷰 */
 document.getElementById('fNo').addEventListener('input', () => {
   const no = document.getElementById('fNo').value.trim();
   const editId = document.getElementById('fId').value;
   const warn = document.getElementById('fNoWarn');
+  const preview = document.getElementById('fNoPreview');
+  const prefix = state.prefix || '중부';
+
+  // 라이브 프리뷰: 숫자만 입력했으면 미리 보여줌
+  if(no && no !== '미지시' && !no.startsWith(prefix) && /^\d+$/.test(no)){
+    preview.textContent = `→ 저장 시: "${prefix}${no}"`;
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+
   if(!no){ warn.classList.remove('show'); return; }
   // "미지시"는 중복 허용
   if(no === '미지시'){ warn.classList.remove('show'); return; }
-  // 정확한 매칭 + 트림된 값으로 비교 (방어적)
-  const dup = state.orders.find(o => (o.no||'').trim() === no && o.id !== editId);
+
+  // 중복 체크는 "접두어 적용 후 값" 기준으로 함 (사용자가 001 입력시 중부001로 비교)
+  const finalNo = (!no.startsWith(prefix) && /^\d+$/.test(no)) ? prefix + no : no;
+  const dup = state.orders.find(o => (o.no||'').trim() === finalNo && o.id !== editId);
   if(dup){
     warn.innerHTML = `⚠ <strong>이미 등록된 지시번호입니다.</strong><br>「${esc(dup.name||'─')}」 (${esc(dup.createdBy||'?')} 등록)`;
     warn.classList.add('show');
@@ -1229,14 +1249,11 @@ document.getElementById('fNo').addEventListener('blur', () => {
   const val = inp.value.trim();
   if(!val) return;
   const prefix = state.prefix || '중부';
-  // "미지시"는 예외
   if(val === '미지시') return;
-  // 이미 접두어 포함되어 있으면 그대로
   if(val.startsWith(prefix)) return;
-  // 숫자만 입력했으면 접두어 추가 (예: "001" → "중부001")
   if(/^\d+$/.test(val)){
     inp.value = prefix + val;
-    // 중복 체크 재실행
+    document.getElementById('fNoPreview').style.display = 'none';
     inp.dispatchEvent(new Event('input'));
   }
 });
