@@ -846,6 +846,12 @@ function initFirebase(){
     document.getElementById('gate').style.display = 'none';
     return false;
   }
+  // Firebase SDK 아직 로드 안 됐으면 조용히 종료 (재시도 로직이 처리)
+  if(typeof firebase === 'undefined'){
+    return false;
+  }
+  // 이미 초기화됐으면 그대로 반환
+  if(db) return true;
   try{
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
@@ -1088,6 +1094,12 @@ async function loadUsers(){
 window.addEventListener('load', async () => {
   const saved = localStorage.getItem('jungbu_name');
   if(saved) document.getElementById('gName').value = saved;
+  // Firebase SDK가 로드될 때까지 최대 5초 대기
+  let retries = 0;
+  while(typeof firebase === 'undefined' && retries < 50){
+    await new Promise(r => setTimeout(r, 100));
+    retries++;
+  }
   // Firebase 미리 초기화 → 설정값 로드 → 브랜딩 적용 (로그인 전에도 사업소 이름 정확히 표시)
   if(initFirebase()){
     try{
