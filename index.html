@@ -267,6 +267,7 @@
   .tool-btn.export{color:var(--accent); border-color:var(--accent-dim)}
   .tool-btn.export:active{background:var(--accent-dim)}
   .btn-view{display:inline-block}
+  .sort-sel{appearance:menulist; min-width:120px; cursor:pointer; padding-right:8px}
 
   /* 모바일에서는 "표" 버튼만 숨김 (테이블은 가로 스크롤 필요해서 모바일 부적합) */
   @media (max-width: 767px){
@@ -431,11 +432,17 @@
     <button data-tab="alert" class="tab-alert" id="tabAlert">⚠ 알림 <span class="cnt" id="cAlert">0</span></button>
   </div>
 
-  <!-- 툴바: 검색 + 보기모드 + 엑셀 -->
+  <!-- 툴바: 검색 + 정렬 + 보기모드 + 엑셀 -->
   <div class="toolbar">
     <div class="search-wrap">
       <input type="search" class="search" id="searchInp" placeholder="지시번호·공사명·위치·소장명 검색..." autocomplete="off">
     </div>
+    <select class="tool-btn sort-sel" id="sortSel">
+      <option value="instDate-desc">📅 최신순</option>
+      <option value="instDate-asc">📅 오래된순</option>
+      <option value="no-asc">🔢 지시번호↑</option>
+      <option value="no-desc">🔢 지시번호↓</option>
+    </select>
     <button class="tool-btn btn-view on" data-view="card">📋 카드</button>
     <button class="tool-btn btn-view" data-view="compact">📜 간단</button>
     <button class="tool-btn btn-view" data-view="table">📊 표</button>
@@ -454,6 +461,7 @@
       <thead>
         <tr>
           <th>지시번호</th>
+          <th>공사지시일</th>
           <th>공사명</th>
           <th>위치</th>
           <th>소장명</th>
@@ -498,6 +506,10 @@
         <div class="field-warn" id="fNoWarn"></div>
       </div>
       <div class="field">
+        <label>공사지시일 <span style="color:var(--text-dim); font-weight:400; font-size:10.5px">(주무관에게 지시 받은 날)</span></label>
+        <input id="fInstDate" type="date" autocomplete="off">
+      </div>
+      <div class="field">
         <label>공사명<span class="req">*</span></label>
         <input id="fName" list="dlProject" placeholder="예: 종로구 ○○동 노후관 교체" autocomplete="off">
       </div>
@@ -517,7 +529,7 @@
       </div>
       <div class="field">
         <label>공사연장 (m)</label>
-        <input id="fLen" type="number" step="0.1" placeholder="예: 120.5" autocomplete="off">
+        <input id="fLen" type="text" inputmode="decimal" placeholder="예: 2000 또는 2000.5" autocomplete="off">
       </div>
       <div style="background:rgba(16,185,129,.06); border:1px solid rgba(16,185,129,.2); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:11.5px; color:var(--text-dim); line-height:1.6">
         💡 <strong style="color:var(--accent)">작업기간(공사예정일·공사완료일)</strong>은 상세보기의 <strong style="color:var(--accent)">공사 진행</strong> 단계에서 입력합니다.<br>
@@ -677,7 +689,8 @@ const state = {
   initialLoad: true,
   seenChatCounts: {},       // 채팅 안읽음 표시용
   searchQuery: '',          // 검색어
-  viewMode: 'card',         // 'card' | 'table'
+  viewMode: 'card',         // 'card' | 'compact' | 'table'
+  sortBy: 'instDate-desc',  // 'instDate-desc' | 'instDate-asc' | 'no-asc' | 'no-desc'
   configLoaded: false,
   passwords: { app: null, admin: null, url: null },
   prefix: '중부'              // 지시번호 자동 접두어 (관리자가 변경 가능)
@@ -770,6 +783,25 @@ const daysBetween = (from, to) => {
   return Math.floor((b - a) / (1000*60*60*24));
 };
 const esc = (s) => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* 숫자 천 단위 구분 (2000 → "2,000", 2000.5 → "2,000.5") */
+function formatNumber(n){
+  if(n === null || n === undefined || n === '') return '';
+  const num = typeof n === 'string' ? parseFloat(String(n).replace(/,/g, '')) : Number(n);
+  if(isNaN(num)) return '';
+  if(num === 0) return '0';
+  if(Number.isInteger(num)) return num.toLocaleString('en-US');
+  return num.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+/* 쉼표 포함 문자열 → 숫자 ("2,000" → 2000) */
+function parseNumber(s){
+  if(!s) return 0;
+  return parseFloat(String(s).replace(/,/g, '')) || 0;
+}
+/* 지시번호 자연 정렬용 (중부001 < 중부010, 강동999 < 중부001) */
+function naturalCompare(a, b){
+  return String(a||'').localeCompare(String(b||''), 'ko', { numeric: true, sensitivity: 'base' });
+}
 
 /* 알림 레벨 계산: 인수일로부터 N일 경과 → 7→주의, 10→경고, 13→위험 */
 function alertLevel(order){
@@ -1200,6 +1232,9 @@ function render(){
     );
   }
 
+  // 정렬 적용 (공사지시일 우선, 없으면 createdAt 폴백)
+  filtered = sortOrders(filtered, state.sortBy);
+
   // 보기 모드에 따라 분기
   if(state.viewMode === 'table'){
     renderTable(filtered);
@@ -1208,6 +1243,32 @@ function render(){
   } else {
     renderCardList(filtered);
   }
+}
+
+/* 정렬 함수 */
+function sortOrders(orders, sortBy){
+  const arr = [...orders];
+  const getInstDate = (o) => {
+    // 공사지시일이 없으면 createdAt(등록일) 으로 폴백
+    if(o.instructionDate) return o.instructionDate;
+    if(o.createdAt?.toDate) return o.createdAt.toDate().toISOString().slice(0,10);
+    return '';
+  };
+  switch(sortBy){
+    case 'instDate-desc':
+      arr.sort((a,b) => getInstDate(b).localeCompare(getInstDate(a)));
+      break;
+    case 'instDate-asc':
+      arr.sort((a,b) => getInstDate(a).localeCompare(getInstDate(b)));
+      break;
+    case 'no-asc':
+      arr.sort((a,b) => naturalCompare(a.no, b.no));
+      break;
+    case 'no-desc':
+      arr.sort((a,b) => naturalCompare(b.no, a.no));
+      break;
+  }
+  return arr;
 }
 
 function renderCompactList(filtered){
@@ -1254,7 +1315,7 @@ function renderCardList(filtered){
 function renderTable(filtered){
   const tbody = document.getElementById('tblBody');
   if(!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:40px; color:var(--text-dim)">
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:40px; color:var(--text-dim)">
       ${state.searchQuery ? '🔍 검색 결과가 없습니다' : '📋 등록된 공사지시가 없습니다'}
     </td></tr>`;
     return;
@@ -1270,11 +1331,12 @@ function renderTable(filtered){
                       (o.loadingDone ? '<span style="color:var(--done)">✓ 완료</span>' : '<span style="color:var(--text-dim)">─</span>');
     return `<tr class="${alClass}" onclick="openDetail('${o.id}')">
       <td class="t-no">${esc(o.no||'')}</td>
+      <td style="font-family:var(--mono); font-size:11.5px">${o.instructionDate?fmtDate(o.instructionDate):'─'}</td>
       <td>${esc(o.name||'')}</td>
       <td>${esc(o.location||'─')}</td>
       <td>${esc(o.bossName||'─')}</td>
       <td style="font-family:var(--mono); font-size:12px">${esc(o.bossPhone||'─')}</td>
-      <td style="font-family:var(--mono); text-align:right">${o.length||'─'}</td>
+      <td style="font-family:var(--mono); text-align:right">${o.length?formatNumber(o.length):'─'}</td>
       <td style="font-family:var(--mono); font-size:11.5px; white-space:nowrap">${period}</td>
       <td style="font-family:var(--mono); font-size:11.5px">${o.drawingReceivedDate?fmtDate(o.drawingReceivedDate):'─'}</td>
       <td><span class="t-st st-${st}">${st}</span></td>
@@ -1324,8 +1386,9 @@ function renderCard(o){
     <div class="card-name">${esc(o.name||'(공사명 없음)')}</div>
     <div class="card-loc">${esc(o.location||'위치 미입력')}</div>
     <div class="card-meta">
+      ${o.instructionDate ? `<span>📅 ${esc(o.instructionDate.replace(/-/g,'.'))}</span>` : ''}
       ${o.bossName ? `<span>👤 ${esc(o.bossName)}</span>` : ''}
-      ${o.length ? `<span>📏 ${esc(o.length)}m</span>` : ''}
+      ${o.length ? `<span>📏 ${formatNumber(o.length)}m</span>` : ''}
       ${drawingTag}
       ${al ? `<span style="color:var(--warn-${al.level==='위험'?'r':al.level==='경고'?'o':'y'})">⏱ D+${al.days} (잔여 ${al.daysLeft}일)</span>` : ''}
     </div>
@@ -1366,6 +1429,23 @@ document.querySelectorAll('.btn-view').forEach(b => {
 /* 엑셀 내보내기 */
 document.getElementById('btnExport').onclick = exportToExcel;
 
+/* 정렬 변경 */
+document.getElementById('sortSel').addEventListener('change', (e) => {
+  state.sortBy = e.target.value;
+  localStorage.setItem('jungbu_sortBy', state.sortBy);
+  render();
+});
+
+/* 저장된 정렬 모드 복원 */
+(function(){
+  const saved = localStorage.getItem('jungbu_sortBy');
+  if(saved){
+    state.sortBy = saved;
+    const sel = document.getElementById('sortSel');
+    if(sel) sel.value = saved;
+  }
+})();
+
 /* ============================================================
    7. 신규/수정 폼
    ============================================================ */
@@ -1383,15 +1463,26 @@ function openForm(order){
   document.getElementById('formTitle').textContent = order ? '공사지시 수정' : '신규 공사지시 등록';
   document.getElementById('fId').value = order?.id || '';
   document.getElementById('fNo').value = order?.no || '';
+  document.getElementById('fInstDate').value = order?.instructionDate || (order ? '' : today());
   document.getElementById('fName').value = order?.name || '';
   document.getElementById('fLoc').value = order?.location || '';
   document.getElementById('fBoss').value = order?.bossName || '';
   document.getElementById('fPhone').value = order?.bossPhone || '';
-  document.getElementById('fLen').value = order?.length || '';
+  document.getElementById('fLen').value = order?.length ? formatNumber(order.length) : '';
   document.getElementById('fNoWarn').classList.remove('show');
   document.getElementById('fNoPreview').style.display = 'none';
   document.getElementById('formModal').classList.add('show');
 }
+
+/* 공사연장 입력: 천 단위 자동 포맷팅 */
+document.getElementById('fLen').addEventListener('input', (e) => {
+  // 숫자·쉼표·소수점만 허용
+  e.target.value = e.target.value.replace(/[^\d.,]/g, '');
+});
+document.getElementById('fLen').addEventListener('blur', (e) => {
+  const n = parseNumber(e.target.value);
+  e.target.value = n ? formatNumber(n) : '';
+});
 
 /* 지시번호 실시간 중복 체크 + 라이브 프리뷰 */
 document.getElementById('fNo').addEventListener('input', () => {
@@ -1476,7 +1567,8 @@ document.getElementById('fSave').onclick = async () => {
     location: document.getElementById('fLoc').value.trim(),
     bossName: document.getElementById('fBoss').value.trim(),
     bossPhone: document.getElementById('fPhone').value.trim(),
-    length: parseFloat(document.getElementById('fLen').value) || 0,
+    length: parseNumber(document.getElementById('fLen').value),
+    instructionDate: document.getElementById('fInstDate').value || '',
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: state.user.name
   };
@@ -1551,9 +1643,10 @@ function renderDetail(o){
     <div class="section">
       <div class="section-head"><span class="ic">📋</span> 기본정보</div>
       <div class="section-body">
+        <div class="info-row"><div class="k">공사지시일</div><div class="v">${o.instructionDate ? fmtDate(o.instructionDate) : '―'}</div></div>
         <div class="info-row"><div class="k">소장</div><div class="v">${esc(o.bossName||'―')}</div></div>
         <div class="info-row"><div class="k">전화번호</div><div class="v">${phoneLink}</div></div>
-        <div class="info-row"><div class="k">공사연장</div><div class="v">${o.length ? esc(o.length)+' m' : '―'}</div></div>
+        <div class="info-row"><div class="k">공사연장</div><div class="v">${o.length ? formatNumber(o.length)+' m' : '―'}</div></div>
         <div class="info-row"><div class="k">작업기간</div><div class="v">${periodStr}</div></div>
         <div class="info-row"><div class="k">등록자</div><div class="v">${esc(o.createdBy||'―')}</div></div>
       </div>
@@ -1980,7 +2073,7 @@ async function exportToExcel(){
     });
 
     // ============= 제목 (병합 + 큰 글씨) =============
-    ws.mergeCells('A1:L1');
+    ws.mergeCells('A1:M1');
     const titleCell = ws.getCell('A1');
     titleCell.value = `서울시 ${sname} 공사지시 현황`;
     titleCell.font = { name:'맑은 고딕', size:16, bold:true, color:{argb:'FF0D1117'} };
@@ -1989,11 +2082,11 @@ async function exportToExcel(){
     ws.getRow(1).height = 34;
 
     // ============= 부제목 =============
-    ws.mergeCells('A2:L2');
+    ws.mergeCells('A2:M2');
     const today = new Date();
     const dStr = today.getFullYear()+'.'+String(today.getMonth()+1).padStart(2,'0')+'.'+String(today.getDate()).padStart(2,'0');
     const subCell = ws.getCell('A2');
-    subCell.value = `출력일: ${dStr}     |     총 ${state.orders.length}건     |     출력자: ${state.user.name}`;
+    subCell.value = `출력일: ${dStr}     |     총 ${state.orders.length}건     |     출력자: ${state.user.name}     |     지시번호 순 정렬`;
     subCell.font = { name:'맑은 고딕', size:10, color:{argb:'FF555555'} };
     subCell.alignment = { horizontal:'center', vertical:'middle' };
     ws.getRow(2).height = 20;
@@ -2002,7 +2095,7 @@ async function exportToExcel(){
     ws.getRow(3).height = 8;
 
     // ============= 헤더 =============
-    const headers = ['지시번호','공사명','공사위치','소장명','전화번호','공사연장(m)','공사예정일','공사완료일','준공도 인수일','로딩 완료일','최종연장(m)','진행상태'];
+    const headers = ['지시번호','공사지시일','공사명','공사위치','소장명','전화번호','공사연장(m)','공사예정일','공사완료일','준공도 인수일','로딩 완료일','최종연장(m)','진행상태'];
     const headerRow = ws.getRow(4);
     headerRow.values = headers;
     headerRow.height = 28;
@@ -2018,22 +2111,24 @@ async function exportToExcel(){
       };
     });
 
-    // ============= 데이터 =============
+    // ============= 데이터 (지시번호 오름차순 정렬) =============
     const fmtD = (s) => s ? s.replace(/-/g,'.') : '';
-    state.orders.forEach((o, i) => {
+    const sortedOrders = [...state.orders].sort((a,b) => naturalCompare(a.no, b.no));
+    sortedOrders.forEach((o, i) => {
       const row = ws.getRow(5 + i);
       row.values = [
         o.no || '',
+        fmtD(o.instructionDate),
         o.name || '',
         o.location || '',
         o.bossName || '',
         o.bossPhone || '',
-        o.length || '',
+        o.length ? Number(o.length) : '',
         fmtD(o.plannedDate || o.startDate),
         fmtD(o.completedDate || o.endDate),
         fmtD(o.drawingReceivedDate),
         fmtD(o.loadingDoneDate),
-        o.finalLength || '',
+        o.finalLength ? Number(o.finalLength) : '',
         orderStatus(o)
       ];
       row.height = 24;
@@ -2041,9 +2136,9 @@ async function exportToExcel(){
       row.eachCell((cell, colNum) => {
         cell.font = { name:'맑은 고딕', size:10.5 };
         cell.alignment = { vertical:'middle', wrapText:true,
-          horizontal: [1,4,5,12].includes(colNum) ? 'center' :
-                      [6,11].includes(colNum) ? 'right' :
-                      [7,8,9,10].includes(colNum) ? 'center' : 'left' };
+          horizontal: [1,5,6,13].includes(colNum) ? 'center' :
+                      [7,12].includes(colNum) ? 'right' :
+                      [2,8,9,10,11].includes(colNum) ? 'center' : 'left' };
         cell.border = {
           top:    { style:'thin', color:{argb:'FFD1D5DB'} },
           bottom: { style:'thin', color:{argb:'FFD1D5DB'} },
@@ -2056,9 +2151,13 @@ async function exportToExcel(){
         }
       });
 
+      // 공사연장 / 최종연장: 천 단위 구분 포맷
+      row.getCell(7).numFmt = '#,##0.##';
+      row.getCell(12).numFmt = '#,##0.##';
+
       // 상태별 색깔
       const st = orderStatus(o);
-      const stCell = row.getCell(12);
+      const stCell = row.getCell(13);
       if(st === '로딩완료')      stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF059669'} };
       else if(st === '측량완료') stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF7C3AED'} };
       else if(st === '공사완료') stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF0891B2'} };
@@ -2072,7 +2171,7 @@ async function exportToExcel(){
       // 알림 임박이면 인수일 빨간색
       const al = alertLevel(o);
       if(al){
-        const dCell = row.getCell(9);
+        const dCell = row.getCell(10);
         if(al.level==='위험') dCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FFDC2626'} };
         else if(al.level==='경고') dCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FFEA580C'} };
         else if(al.level==='주의') dCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FFCA8A04'} };
@@ -2080,12 +2179,12 @@ async function exportToExcel(){
     });
 
     // ============= 열 너비 =============
-    const widths = [13, 32, 26, 11, 16, 12, 13, 13, 14, 14, 12, 11];
+    const widths = [13, 12, 30, 24, 11, 16, 12, 13, 13, 14, 14, 12, 11];
     widths.forEach((w, i) => ws.getColumn(i+1).width = w);
 
     // ============= 푸터 =============
     const lastRow = 5 + state.orders.length + 1;
-    ws.mergeCells(`A${lastRow}:L${lastRow}`);
+    ws.mergeCells(`A${lastRow}:M${lastRow}`);
     const footCell = ws.getCell(`A${lastRow}`);
     footCell.value = `※ 본 자료는 ${dStr} 시점의 현장관리 시스템 데이터입니다. (서울시 ${sname})`;
     footCell.font = { name:'맑은 고딕', size:9, italic:true, color:{argb:'FF999999'} };
