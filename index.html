@@ -401,7 +401,8 @@
       <div class="h-user">
         <div class="who" id="hWho">―</div>
         <div style="font-size:10px; color:var(--text-dim)"><span class="sync-dot off" id="syncDot"></span><span id="syncTxt">연결 중...</span></div>
-        <div style="display:flex; gap:5px; margin-top:6px; justify-content:flex-end">
+        <div style="display:flex; gap:5px; margin-top:6px; justify-content:flex-end; flex-wrap:wrap">
+          <button id="manualBtn" style="background:none; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer" title="사용 매뉴얼">📖 매뉴얼</button>
           <button id="adminBtn" style="display:none; background:var(--accent-dim); color:#d1fae5; border:1px solid var(--accent); padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer">⚙️ 관리자</button>
           <button id="logoutBtn" style="background:none; border:1px solid var(--line); color:var(--text-dim); padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer" title="로그아웃">⏻ 로그아웃</button>
         </div>
@@ -1486,14 +1487,36 @@ function openForm(order){
   document.getElementById('formModal').classList.add('show');
 }
 
-/* 공사연장 입력: 천 단위 자동 포맷팅 */
+/* 공사연장 입력: 천 단위 자동 포맷팅 (실시간) */
 document.getElementById('fLen').addEventListener('input', (e) => {
-  // 숫자·쉼표·소수점만 허용
-  e.target.value = e.target.value.replace(/[^\d.,]/g, '');
-});
-document.getElementById('fLen').addEventListener('blur', (e) => {
-  const n = parseNumber(e.target.value);
-  e.target.value = n ? formatNumber(n) : '';
+  const input = e.target;
+  const cursorPos = input.selectionStart;
+  const rawBefore = input.value.substring(0, cursorPos);
+  const digitsBefore = (rawBefore.match(/[\d.]/g) || []).length;
+
+  // 숫자와 소수점만 추출
+  let val = input.value.replace(/[^\d.]/g, '');
+  // 소수점은 1개만 허용
+  const parts = val.split('.');
+  if(parts.length > 2) val = parts[0] + '.' + parts.slice(1).join('');
+
+  // 천 단위 구분 적용
+  if(val){
+    const [intPart, decPart] = val.split('.');
+    const formattedInt = intPart ? parseInt(intPart, 10).toLocaleString('en-US') : '';
+    input.value = decPart !== undefined ? formattedInt + '.' + decPart : formattedInt;
+  } else {
+    input.value = '';
+  }
+
+  // 커서 위치 복원 (디지트 개수 기준)
+  let newPos = 0;
+  let digitsCount = 0;
+  while(newPos < input.value.length && digitsCount < digitsBefore){
+    if(/[\d.]/.test(input.value[newPos])) digitsCount++;
+    newPos++;
+  }
+  input.setSelectionRange(newPos, newPos);
 });
 
 /* 지시번호 실시간 중복 체크 + 라이브 프리뷰 */
@@ -2226,6 +2249,10 @@ async function exportToExcel(){
    ============================================================ */
 document.getElementById('adminBtn').onclick = openAdminPanel;
 document.getElementById('logoutBtn').onclick = doLogout;
+document.getElementById('manualBtn').onclick = () => {
+  // 같은 폴더의 매뉴얼.html 새 탭에서 열기
+  window.open('매뉴얼.html', '_blank');
+};
 
 async function doLogout(){
   if(!confirm('로그아웃 하시겠습니까?')) return;
