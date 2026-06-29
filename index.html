@@ -97,11 +97,26 @@
   .tabs button.tab-alert.has{border-color:var(--warn-r); color:var(--warn-r)}
   .tabs button.tab-alert.has.on{background:var(--warn-r); border-color:var(--warn-r); color:#fff}
 
-  /* ---------- 알림 배너 ---------- */
-  #alertBar{display:none; padding:0 12px 10px; background:var(--ink); border-bottom:1px solid var(--line); flex-shrink:0}
+  /* ---------- 알림 배너 (드래그 가능 + 닫기 가능 플로팅 패널) ---------- */
+  #alertBar{position:fixed; top:80px; right:14px; z-index:300; width:280px; max-width:calc(100vw - 28px); background:var(--ink2); border:1px solid rgba(239,68,68,.4); border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,.5); display:none; overflow:hidden}
   #alertBar.show{display:block}
-  .alert-strip{display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:9px; font-size:12px; font-weight:600; cursor:pointer; margin-top:6px}
-  .alert-strip:first-child{margin-top:0}
+  #alertBar.minimized .alert-body{display:none}
+  #alertBar .alert-head{display:flex; align-items:center; gap:7px; padding:7px 9px 7px 11px; background:rgba(239,68,68,.18); cursor:move; user-select:none; touch-action:none}
+  #alertBar .alert-head .icn{font-size:13px}
+  #alertBar .alert-title{flex:1; font-size:11.5px; font-weight:700; color:var(--warn-r); letter-spacing:.3px}
+  #alertBar .alert-actions{display:flex; gap:3px}
+  #alertBar .alert-actions button{background:rgba(0,0,0,.25); border:1px solid rgba(239,68,68,.4); color:#fca5a5; font-size:11px; font-weight:700; width:22px; height:22px; border-radius:5px; cursor:pointer; padding:0; display:flex; align-items:center; justify-content:center; line-height:1}
+  #alertBar .alert-actions button:hover{background:rgba(239,68,68,.3); color:#fff}
+  #alertBar .alert-body{padding:7px; max-height:240px; overflow-y:auto}
+  #alertBar .alert-strip{margin-top:5px}
+  #alertBar .alert-strip:first-child{margin-top:0}
+
+  /* 다시 보기 버튼 */
+  #alertReopen{position:fixed; top:80px; right:14px; z-index:300; background:rgba(239,68,68,.2); border:1px solid var(--warn-r); color:#fca5a5; font-weight:700; padding:7px 11px; border-radius:8px; cursor:pointer; display:none; font-size:12px; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(0,0,0,.3); animation:pulse 2s infinite}
+  #alertReopen.show{display:inline-flex}
+  #alertReopen:hover{background:rgba(239,68,68,.3); color:#fff}
+
+  .alert-strip{display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:7px; font-size:11.5px; font-weight:600; cursor:pointer}
   .alert-strip.lv-주의{background:rgba(250,204,21,.12); color:var(--warn-y); border:1px solid rgba(250,204,21,.3)}
   .alert-strip.lv-경고{background:rgba(251,146,60,.14); color:var(--warn-o); border:1px solid rgba(251,146,60,.32)}
   .alert-strip.lv-위험{background:rgba(239,68,68,.16); color:var(--warn-r); border:1px solid rgba(239,68,68,.4); animation:pulse 2s infinite}
@@ -453,8 +468,21 @@
     <button class="tool-btn export" id="btnExport">📥 엑셀</button>
   </div>
 
-  <!-- 위험 알림 스트립 (있을때만 표시) -->
-  <div id="alertBar"></div>
+  <!-- 위험 알림 패널 (드래그 가능, 닫기 가능) -->
+  <div id="alertBar">
+    <div class="alert-head" id="alertDragHandle">
+      <span class="icn">⚠</span>
+      <span class="alert-title" id="alertTitle">위험 알림</span>
+      <div class="alert-actions">
+        <button id="alertMinBtn" title="접기">−</button>
+        <button id="alertCloseBtn" title="숨기기">×</button>
+      </div>
+    </div>
+    <div class="alert-body" id="alertBody"></div>
+  </div>
+
+  <!-- 알림 다시 보기 버튼 (닫혔을 때만) -->
+  <button id="alertReopen" title="알림 다시 보기">⚠ <span id="alertReopenCount">0</span>건</button>
 
   <!-- 지시서 리스트 (카드 뷰) -->
   <div class="list" id="list"></div>
@@ -1264,19 +1292,31 @@ function render(){
   if(alerts > 0) tabAlert.classList.add('has');
   else tabAlert.classList.remove('has');
 
-  // 위험 알림 스트립 (인수일 13일 경과만 상단 노출)
+  // 위험 알림 패널 (드래그 + 닫기 가능)
   const bar = document.getElementById('alertBar');
+  const reopen = document.getElementById('alertReopen');
   const danger = alertList.filter(a => a.level === '위험');
+  const isUserHidden = localStorage.getItem('jungbu_alertHidden') === '1';
+
   if(danger.length && state.currentTab !== 'alert'){
-    bar.classList.add('show');
-    bar.innerHTML = danger.map(a =>
+    document.getElementById('alertTitle').textContent = `위험 알림 ${danger.length}건`;
+    document.getElementById('alertReopenCount').textContent = danger.length;
+    document.getElementById('alertBody').innerHTML = danger.map(a =>
       `<div class="alert-strip lv-위험" onclick="openDetail('${a.order.id}')">
         <span class="lv">${a.level}</span>
         <span class="no">${esc(a.order.no)}</span>
         <span class="ds">D+${a.days}</span>
       </div>`).join('');
+    if(isUserHidden){
+      bar.classList.remove('show');
+      reopen.classList.add('show');
+    } else {
+      bar.classList.add('show');
+      reopen.classList.remove('show');
+    }
   } else {
     bar.classList.remove('show');
+    reopen.classList.remove('show');
   }
 
   // 탭 필터링 (단계 기반)
@@ -2328,6 +2368,103 @@ document.getElementById('manualBtn').onclick = () => {
   // 같은 폴더의 매뉴얼.html 새 탭에서 열기
   window.open('매뉴얼.html', '_blank');
 };
+
+/* ============================================================
+   위험 알림 패널 — 드래그 / 닫기 / 접기
+   ============================================================ */
+(function setupAlertPanel(){
+  const bar = document.getElementById('alertBar');
+  const handle = document.getElementById('alertDragHandle');
+  const closeBtn = document.getElementById('alertCloseBtn');
+  const minBtn = document.getElementById('alertMinBtn');
+  const reopen = document.getElementById('alertReopen');
+
+  // 저장된 위치 복원
+  const savedPos = localStorage.getItem('jungbu_alertPos');
+  if(savedPos){
+    try{
+      const p = JSON.parse(savedPos);
+      // 화면 내 유효 범위 확인
+      if(p.left >= 0 && p.left < window.innerWidth - 50 && p.top >= 0 && p.top < window.innerHeight - 50){
+        bar.style.left = p.left + 'px';
+        bar.style.top = p.top + 'px';
+        bar.style.right = 'auto';
+      }
+    }catch(e){}
+  }
+  // 저장된 접기 상태 복원
+  if(localStorage.getItem('jungbu_alertMin') === '1'){
+    bar.classList.add('minimized');
+    minBtn.textContent = '+';
+  }
+
+  // 드래그 처리 (마우스 + 터치)
+  let dragging = false, startX, startY, barStartX, barStartY;
+  const onStart = (e) => {
+    if(e.target.closest('button')) return; // 버튼 위에서는 드래그 안 함
+    dragging = true;
+    const evt = e.touches ? e.touches[0] : e;
+    startX = evt.clientX;
+    startY = evt.clientY;
+    const rect = bar.getBoundingClientRect();
+    barStartX = rect.left;
+    barStartY = rect.top;
+    e.preventDefault();
+  };
+  const onMove = (e) => {
+    if(!dragging) return;
+    const evt = e.touches ? e.touches[0] : e;
+    const dx = evt.clientX - startX;
+    const dy = evt.clientY - startY;
+    let newX = barStartX + dx;
+    let newY = barStartY + dy;
+    const rect = bar.getBoundingClientRect();
+    // 화면 밖으로 나가지 않게 제한
+    newX = Math.max(0, Math.min(window.innerWidth - rect.width, newX));
+    newY = Math.max(0, Math.min(window.innerHeight - rect.height, newY));
+    bar.style.left = newX + 'px';
+    bar.style.top = newY + 'px';
+    bar.style.right = 'auto';
+    e.preventDefault();
+  };
+  const onEnd = () => {
+    if(!dragging) return;
+    dragging = false;
+    const rect = bar.getBoundingClientRect();
+    localStorage.setItem('jungbu_alertPos', JSON.stringify({left: rect.left, top: rect.top}));
+  };
+  handle.addEventListener('mousedown', onStart);
+  handle.addEventListener('touchstart', onStart, {passive: false});
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('touchmove', onMove, {passive: false});
+  document.addEventListener('mouseup', onEnd);
+  document.addEventListener('touchend', onEnd);
+
+  // 닫기 (× 버튼) → 숨기고 다시 보기 버튼 표시
+  closeBtn.onclick = (e) => {
+    e.stopPropagation();
+    bar.classList.remove('show');
+    reopen.classList.add('show');
+    localStorage.setItem('jungbu_alertHidden', '1');
+  };
+
+  // 접기 (− 버튼) → 헤더만 남기고 본문 숨김
+  minBtn.onclick = (e) => {
+    e.stopPropagation();
+    bar.classList.toggle('minimized');
+    const min = bar.classList.contains('minimized');
+    minBtn.textContent = min ? '+' : '−';
+    localStorage.setItem('jungbu_alertMin', min ? '1' : '0');
+  };
+
+  // 다시 보기 버튼 → 알림 패널 다시 표시
+  reopen.onclick = () => {
+    bar.classList.add('show');
+    reopen.classList.remove('show');
+    localStorage.removeItem('jungbu_alertHidden');
+  };
+})();
+
 
 /* ============================================================
    핸드폰 뒤로가기 버튼 처리
