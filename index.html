@@ -2751,10 +2751,24 @@ document.getElementById('excelImport').addEventListener('change', async (e) => {
       return;
     }
 
-    // 중복 체크
-    const existingNos = new Set(state.orders.map(o => (o.no||'').trim()));
-    const newRecords = records.filter(r => !existingNos.has(r.no));
-    const dupRecords = records.filter(r => existingNos.has(r.no));
+    // 중복 체크 (지시번호 기준)
+    const existingMap = new Map();
+    state.orders.forEach(o => existingMap.set((o.no||'').trim(), o));
+    const newRecords = records.filter(r => !existingMap.has(r.no));
+    const dupRecords = records.filter(r => existingMap.has(r.no));
+
+    // 업데이트할 만한 항목 찾기 (기존 데이터에 누락된 필드가 새 데이터에 있는 경우)
+    const updateRecords = dupRecords.filter(r => {
+      const existing = existingMap.get(r.no);
+      // 다음 필드 중 하나라도 기존에 없는데 새로 들어오면 업데이트 대상
+      return (r.drawingReceivedDate && !existing.drawingReceivedDate)
+          || (r.instructionDate && !existing.instructionDate)
+          || (r.plannedDate && !existing.plannedDate)
+          || (r.completedDate && !existing.completedDate)
+          || (r.bossName && !existing.bossName)
+          || (r.bossPhone && !existing.bossPhone)
+          || (r.length > 0 && !existing.length);
+    });
 
     // 미리보기 출력
     resultDiv.innerHTML = `
@@ -2763,19 +2777,29 @@ document.getElementById('excelImport').addEventListener('change', async (e) => {
         <div style="font-size:11.5px; color:var(--text)">
           ▶ 총 데이터: <strong>${records.length}건</strong><br>
           ▶ 신규 등록: <strong style="color:var(--accent)">${newRecords.length}건</strong><br>
-          ▶ 이미 등록됨 (스킵): <strong style="color:var(--warn-o)">${dupRecords.length}건</strong>
+          ▶ 이미 등록됨: <strong style="color:var(--warn-o)">${dupRecords.length}건</strong> ${updateRecords.length > 0 ? `<span style="color:var(--accent)">(이 중 ${updateRecords.length}건은 누락 정보 보완 가능)</span>` : ''}
         </div>
       </div>
-      ${newRecords.length > 0 ? `
+      ${updateRecords.length > 0 ? `
+        <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer; padding:8px; background:rgba(96,165,250,.08); border:1px solid rgba(96,165,250,.3); border-radius:6px">
+          <input type="checkbox" id="cbDoUpdate" checked style="width:16px; height:16px; cursor:pointer">
+          <span style="font-size:12px; color:var(--text)"><strong>기존 데이터의 누락 정보도 보완</strong> (${updateRecords.length}건)</span>
+        </label>
+      ` : ''}
+      ${(newRecords.length > 0 || updateRecords.length > 0) ? `
         <div style="font-size:11px; color:var(--text-dim); margin-bottom:8px">
-          처음 5건 미리보기: ${newRecords.slice(0, 5).map(r => esc(r.no)).join(', ')}${newRecords.length > 5 ? ' ...' : ''}
+          ${newRecords.length > 0 ? `신규 미리보기: ${newRecords.slice(0, 5).map(r => esc(r.no)).join(', ')}${newRecords.length > 5 ? ' ...' : ''}<br>` : ''}
+          ${updateRecords.length > 0 ? `보완 대상: ${updateRecords.slice(0, 5).map(r => esc(r.no)).join(', ')}${updateRecords.length > 5 ? ' ...' : ''}` : ''}
         </div>
-        <button class="btn-primary" style="margin:0; width:100%" id="btnExcelConfirm">🚀 ${newRecords.length}건 등록 시작</button>
-      ` : '<div style="color:var(--text-dim); font-size:12px">모든 데이터가 이미 등록되어 있습니다.</div>'}
+        <button class="btn-primary" style="margin:0; width:100%" id="btnExcelConfirm">🚀 실행</button>
+      ` : '<div style="color:var(--text-dim); font-size:12px">모든 데이터가 이미 등록되어 있고, 추가로 보완할 정보도 없습니다.</div>'}
     `;
 
-    if(newRecords.length > 0){
-      document.getElementById('btnExcelConfirm').onclick = () => importToFirestore(newRecords, resultDiv);
+    if(newRecords.length > 0 || updateRecords.length > 0){
+      document.getElementById('btnExcelConfirm').onclick = () => {
+        const doUpdate = document.getElementById('cbDoUpdate')?.checked;
+        importToFirestore(newRecords, doUpdate ? updateRecords : [], existingMap, resultDiv);
+      };
     }
   }catch(err){
     console.error(err);
@@ -2888,18 +2912,18 @@ function parseExcelSheet(sheet){
       rec.inProgress = true; rec.inProgressDate = plannedDate || '';
       rec.completed = true; rec.completedDate = completedDate || ''; rec.endDate = rec.completedDate;
       rec.surveyed = true; rec.surveyedDate = completedDate || '';
-      if(drawingDate){
-        rec.drawingReceived = true; rec.drawingReceivedDate = drawingDate;
-      }
     } else if(state_str === '로딩완료'){
       rec.planned = true; rec.plannedDate = plannedDate || ''; rec.startDate = rec.plannedDate;
       rec.inProgress = true; rec.inProgressDate = plannedDate || '';
       rec.completed = true; rec.completedDate = completedDate || ''; rec.endDate = rec.completedDate;
       rec.surveyed = true; rec.surveyedDate = completedDate || '';
-      if(drawingDate){
-        rec.drawingReceived = true; rec.drawingReceivedDate = drawingDate;
-      }
       rec.loaded = true; rec.loadedDate = drawingDate || completedDate || '';
+    }
+
+    // AB열 (준공도 인수일) 은 진행상태와 무관하게 항상 적용
+    if(drawingDate){
+      rec.drawingReceived = true;
+      rec.drawingReceivedDate = drawingDate;
     }
 
     records.push(rec);
@@ -2907,14 +2931,14 @@ function parseExcelSheet(sheet){
   return records;
 }
 
-/* Firestore에 일괄 등록 (배치 처리) */
-async function importToFirestore(records, resultDiv){
-  const total = records.length;
-  let done = 0, failed = 0;
+/* Firestore에 일괄 등록 / 업데이트 (배치 처리) */
+async function importToFirestore(newRecords, updateRecords, existingMap, resultDiv){
+  const total = newRecords.length + updateRecords.length;
+  let doneNew = 0, doneUpd = 0, failed = 0;
 
   resultDiv.innerHTML = `
     <div style="background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.3); border-radius:6px; padding:12px">
-      <div style="font-weight:700; color:var(--accent); margin-bottom:6px">⏳ 등록 진행 중...</div>
+      <div style="font-weight:700; color:var(--accent); margin-bottom:6px">⏳ 처리 중...</div>
       <div id="impProg" style="font-family:var(--mono); font-size:13px">0 / ${total}</div>
       <div style="background:#0a121e; border-radius:4px; height:6px; margin-top:6px; overflow:hidden">
         <div id="impBar" style="background:var(--accent); height:100%; width:0%; transition:width .2s"></div>
@@ -2924,10 +2948,10 @@ async function importToFirestore(records, resultDiv){
   const progEl = document.getElementById('impProg');
   const barEl = document.getElementById('impBar');
 
-  // 100건씩 배치 (Firestore 한 번에 500개 가능하지만 안전하게)
+  // --- 신규 등록 (배치 100건씩) ---
   const chunkSize = 100;
-  for(let i = 0; i < records.length; i += chunkSize){
-    const chunk = records.slice(i, i + chunkSize);
+  for(let i = 0; i < newRecords.length; i += chunkSize){
+    const chunk = newRecords.slice(i, i + chunkSize);
     const batch = db.batch();
     for(const r of chunk){
       const ref = db.collection('orders').doc();
@@ -2941,25 +2965,72 @@ async function importToFirestore(records, resultDiv){
     }
     try{
       await batch.commit();
-      done += chunk.length;
+      doneNew += chunk.length;
     }catch(err){
-      console.error('배치 등록 실패:', err);
+      console.error('신규 등록 배치 실패:', err);
       failed += chunk.length;
     }
-    progEl.textContent = `${done + failed} / ${total}`;
-    barEl.style.width = `${(done + failed) / total * 100}%`;
+    progEl.textContent = `${doneNew + doneUpd + failed} / ${total}`;
+    barEl.style.width = `${(doneNew + doneUpd + failed) / total * 100}%`;
+  }
+
+  // --- 업데이트 (누락 정보 보완) ---
+  for(let i = 0; i < updateRecords.length; i += chunkSize){
+    const chunk = updateRecords.slice(i, i + chunkSize);
+    const batch = db.batch();
+    for(const r of chunk){
+      const existing = existingMap.get(r.no);
+      if(!existing) continue;
+      const patch = {};
+      // 비어있는 필드만 채움 (기존 데이터 보존)
+      if(r.drawingReceivedDate && !existing.drawingReceivedDate){
+        patch.drawingReceived = true;
+        patch.drawingReceivedDate = r.drawingReceivedDate;
+      }
+      if(r.instructionDate && !existing.instructionDate) patch.instructionDate = r.instructionDate;
+      if(r.plannedDate && !existing.plannedDate){
+        patch.plannedDate = r.plannedDate;
+        patch.startDate = r.plannedDate;
+        if(r.planned) patch.planned = true;
+      }
+      if(r.completedDate && !existing.completedDate){
+        patch.completedDate = r.completedDate;
+        patch.endDate = r.completedDate;
+      }
+      if(r.bossName && !existing.bossName) patch.bossName = r.bossName;
+      if(r.bossPhone && !existing.bossPhone) patch.bossPhone = r.bossPhone;
+      if(r.length > 0 && !existing.length) patch.length = r.length;
+      if(r.location && !existing.location) patch.location = r.location;
+
+      if(Object.keys(patch).length > 0){
+        patch.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+        patch.updatedBy = state.user.name + ' (엑셀 보완)';
+        const ref = db.collection('orders').doc(existing.id);
+        batch.update(ref, patch);
+      }
+    }
+    try{
+      await batch.commit();
+      doneUpd += chunk.length;
+    }catch(err){
+      console.error('업데이트 배치 실패:', err);
+      failed += chunk.length;
+    }
+    progEl.textContent = `${doneNew + doneUpd + failed} / ${total}`;
+    barEl.style.width = `${(doneNew + doneUpd + failed) / total * 100}%`;
   }
 
   resultDiv.innerHTML = `
     <div style="background:rgba(16,185,129,.1); border:1px solid var(--accent); border-radius:6px; padding:12px">
-      <div style="font-weight:700; color:var(--accent); margin-bottom:6px">✅ 등록 완료</div>
+      <div style="font-weight:700; color:var(--accent); margin-bottom:6px">✅ 완료</div>
       <div style="font-size:12px; color:var(--text)">
-        ▶ 성공: <strong style="color:var(--accent)">${done}건</strong><br>
+        ${doneNew > 0 ? `▶ 신규 등록: <strong style="color:var(--accent)">${doneNew}건</strong><br>` : ''}
+        ${doneUpd > 0 ? `▶ 누락 정보 보완: <strong style="color:#60a5fa">${doneUpd}건</strong><br>` : ''}
         ${failed > 0 ? `▶ 실패: <strong style="color:var(--warn-r)">${failed}건</strong>` : ''}
       </div>
     </div>
   `;
-  showToast({ title:`✓ ${done}건 등록 완료`, sub: failed > 0 ? `${failed}건 실패` : '' });
+  showToast({ title:`✓ 신규 ${doneNew} / 보완 ${doneUpd}건`, sub: failed > 0 ? `${failed}건 실패` : '' });
 }
 
 
