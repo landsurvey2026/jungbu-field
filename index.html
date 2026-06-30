@@ -522,7 +522,7 @@
 <datalist id="dlLocation"></datalist>
 
 <!-- 제작자 크레딧 + 버전 -->
-<div class="credit">v2.2 · © Seo Young Min</div>
+<div class="credit">v2.3 · © Seo Young Min</div>
 
 <!-- ============== 신규/수정 모달 ============== -->
 <div class="modal" id="formModal">
@@ -2784,19 +2784,29 @@ document.getElementById('excelImport').addEventListener('change', async (e) => {
     const newRecords = records.filter(r => !existingMap.has(r.no));
     const dupRecords = records.filter(r => existingMap.has(r.no));
 
-    // 업데이트할 만한 항목 찾기 (기존 데이터에 누락된 필드가 새 데이터에 있는 경우)
+    // 업데이트할 만한 항목 찾기 (엑셀 값이 기존과 다르거나 누락이 있는 경우)
     const updateRecords = dupRecords.filter(r => {
       const existing = existingMap.get(r.no);
-      // 다음 필드 중 하나라도 기존에 없는데 새로 들어오면 업데이트 대상
-      return (r.drawingReceivedDate && !existing.drawingReceivedDate)
-          || (r.loadedDate && !existing.loadedDate)
-          || (r.instructionDate && !existing.instructionDate)
-          || (r.plannedDate && !existing.plannedDate)
-          || (r.completedDate && !existing.completedDate)
-          || (r.bossName && !existing.bossName)
-          || (r.bossPhone && !existing.bossPhone)
-          || (r.length > 0 && !existing.length)
-          || (r.chatMessages && r.chatMessages.length > 0 && !existing.excelChatAdded);
+      // 엑셀 status 데이터가 기존과 다르면 동기화 대상
+      const dateChanged = (f) => r[f] && r[f] !== (existing[f] || '');
+      if(dateChanged('loadedDate')) return true;
+      if(dateChanged('drawingReceivedDate')) return true;
+      if(dateChanged('instructionDate')) return true;
+      if(dateChanged('plannedDate')) return true;
+      if(dateChanged('completedDate')) return true;
+      // 단계 플래그가 다르면 (예: 엑셀은 로딩완료지만 기존은 측량완료)
+      if(!!r.loaded !== !!existing.loaded) return true;
+      if(!!r.drawingReceived !== !!existing.drawingReceived) return true;
+      if(!!r.surveyed !== !!existing.surveyed) return true;
+      if(!!r.completed !== !!existing.completed) return true;
+      if(!!r.inProgress !== !!existing.inProgress) return true;
+      // 누락된 앱 정보가 있으면
+      if(r.bossName && !existing.bossName) return true;
+      if(r.bossPhone && !existing.bossPhone) return true;
+      if(r.length > 0 && !existing.length) return true;
+      if(r.location && !existing.location) return true;
+      if(r.chatMessages && r.chatMessages.length > 0 && !existing.excelChatAdded) return true;
+      return false;
     });
 
     // 미리보기 출력
@@ -2806,22 +2816,25 @@ document.getElementById('excelImport').addEventListener('change', async (e) => {
         <div style="font-size:11.5px; color:var(--text)">
           ▶ 총 데이터: <strong>${records.length}건</strong><br>
           ▶ 신규 등록: <strong style="color:var(--accent)">${newRecords.length}건</strong><br>
-          ▶ 이미 등록됨: <strong style="color:var(--warn-o)">${dupRecords.length}건</strong> ${updateRecords.length > 0 ? `<span style="color:var(--accent)">(이 중 ${updateRecords.length}건은 누락 정보 보완 가능)</span>` : ''}
+          ▶ 이미 등록됨: <strong style="color:var(--warn-o)">${dupRecords.length}건</strong> ${updateRecords.length > 0 ? `<span style="color:#60a5fa">(이 중 ${updateRecords.length}건은 엑셀과 다름)</span>` : ''}
         </div>
       </div>
       ${updateRecords.length > 0 ? `
-        <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer; padding:8px; background:rgba(96,165,250,.08); border:1px solid rgba(96,165,250,.3); border-radius:6px">
-          <input type="checkbox" id="cbDoUpdate" checked style="width:16px; height:16px; cursor:pointer">
-          <span style="font-size:12px; color:var(--text)"><strong>기존 데이터의 누락 정보도 보완</strong> (${updateRecords.length}건)</span>
+        <label style="display:flex; align-items:flex-start; gap:8px; margin-bottom:8px; cursor:pointer; padding:10px; background:rgba(96,165,250,.08); border:1px solid rgba(96,165,250,.3); border-radius:6px">
+          <input type="checkbox" id="cbDoUpdate" checked style="width:16px; height:16px; cursor:pointer; flex-shrink:0; margin-top:1px">
+          <span style="font-size:12px; color:var(--text); line-height:1.5">
+            <strong>기존 데이터를 엑셀과 동기화</strong> (${updateRecords.length}건)<br>
+            <span style="color:var(--text-dim); font-size:11px">진행상태·날짜 등을 엑셀 값으로 갱신 (앱에서 입력한 소장명·위치 등은 보존)</span>
+          </span>
         </label>
       ` : ''}
       ${(newRecords.length > 0 || updateRecords.length > 0) ? `
         <div style="font-size:11px; color:var(--text-dim); margin-bottom:8px">
-          ${newRecords.length > 0 ? `신규 미리보기: ${newRecords.slice(0, 5).map(r => esc(r.no)).join(', ')}${newRecords.length > 5 ? ' ...' : ''}<br>` : ''}
-          ${updateRecords.length > 0 ? `보완 대상: ${updateRecords.slice(0, 5).map(r => esc(r.no)).join(', ')}${updateRecords.length > 5 ? ' ...' : ''}` : ''}
+          ${newRecords.length > 0 ? `신규: ${newRecords.slice(0, 5).map(r => esc(r.no)).join(', ')}${newRecords.length > 5 ? ' ...' : ''}<br>` : ''}
+          ${updateRecords.length > 0 ? `동기화 대상: ${updateRecords.slice(0, 5).map(r => esc(r.no)).join(', ')}${updateRecords.length > 5 ? ' ...' : ''}` : ''}
         </div>
         <button class="btn-primary" style="margin:0; width:100%" id="btnExcelConfirm">🚀 실행</button>
-      ` : '<div style="color:var(--text-dim); font-size:12px">모든 데이터가 이미 등록되어 있고, 추가로 보완할 정보도 없습니다.</div>'}
+      ` : '<div style="color:var(--text-dim); font-size:12px">모든 데이터가 이미 엑셀과 동일합니다. 변경사항 없음.</div>'}
     `;
 
     if(newRecords.length > 0 || updateRecords.length > 0){
@@ -3039,7 +3052,7 @@ async function importToFirestore(newRecords, updateRecords, existingMap, resultD
     barEl.style.width = `${(doneNew + doneUpd + failed) / total * 100}%`;
   }
 
-  // --- 업데이트 (누락 정보 보완) ---
+  // --- 업데이트 (엑셀 값으로 동기화 + 누락 정보 보완) ---
   for(let i = 0; i < updateRecords.length; i += chunkSize){
     const chunk = updateRecords.slice(i, i + chunkSize);
     const batch = db.batch();
@@ -3047,50 +3060,50 @@ async function importToFirestore(newRecords, updateRecords, existingMap, resultD
       const existing = existingMap.get(r.no);
       if(!existing) continue;
       const patch = {};
-      // 비어있는 필드만 채움 (기존 데이터 보존)
-      if(r.drawingReceivedDate && !existing.drawingReceivedDate){
-        patch.drawingReceived = true;
-        patch.drawingReceivedDate = r.drawingReceivedDate;
-      }
-      if(r.loadedDate && !existing.loadedDate){
-        patch.loadedDate = r.loadedDate;
-        if(r.loaded) patch.loaded = true;
-      }
-      if(r.instructionDate && !existing.instructionDate) patch.instructionDate = r.instructionDate;
-      if(r.plannedDate && !existing.plannedDate){
-        patch.plannedDate = r.plannedDate;
-        patch.startDate = r.plannedDate;
-        if(r.planned) patch.planned = true;
-      }
-      if(r.completedDate && !existing.completedDate){
-        patch.completedDate = r.completedDate;
-        patch.endDate = r.completedDate;
-      }
+
+      // ==== status 관련 필드는 항상 엑셀 값으로 동기화 (엑셀이 진실의 원천) ====
+      // 단계 플래그
+      patch.planned = !!r.planned;
+      patch.inProgress = !!r.inProgress;
+      patch.completed = !!r.completed;
+      patch.surveyed = !!r.surveyed;
+      patch.loaded = !!r.loaded;
+      patch.drawingReceived = !!r.drawingReceived;
+      // 단계 날짜
+      if(r.plannedDate){ patch.plannedDate = r.plannedDate; patch.startDate = r.plannedDate; }
+      if(r.inProgressDate) patch.inProgressDate = r.inProgressDate;
+      if(r.completedDate){ patch.completedDate = r.completedDate; patch.endDate = r.completedDate; }
+      if(r.surveyedDate) patch.surveyedDate = r.surveyedDate;
+      if(r.loadedDate) patch.loadedDate = r.loadedDate;
+      if(r.drawingReceivedDate) patch.drawingReceivedDate = r.drawingReceivedDate;
+      // 공사지시일도 엑셀 우선
+      if(r.instructionDate) patch.instructionDate = r.instructionDate;
+
+      // ==== 앱 정보 필드는 누락된 경우에만 채움 (사용자 수정 보존) ====
       if(r.bossName && !existing.bossName) patch.bossName = r.bossName;
       if(r.bossPhone && !existing.bossPhone) patch.bossPhone = r.bossPhone;
       if(r.length > 0 && !existing.length) patch.length = r.length;
       if(r.location && !existing.location) patch.location = r.location;
 
-      // 채팅 메시지가 있고 아직 추가된 적 없으면 추가
+      // 채팅 메시지 (특이사항·부분로딩 기록) - 한 번만 추가
       const chatMsgs = r.chatMessages || [];
       const addChat = chatMsgs.length > 0 && !existing.excelChatAdded;
 
-      if(Object.keys(patch).length > 0 || addChat){
-        patch.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-        patch.updatedBy = state.user.name + ' (엑셀 보완)';
-        if(addChat) patch.excelChatAdded = true;
-        const ref = db.collection('orders').doc(existing.id);
-        batch.update(ref, patch);
+      patch.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      patch.updatedBy = state.user.name + ' (엑셀 동기화)';
+      if(addChat) patch.excelChatAdded = true;
 
-        if(addChat){
-          for(const msg of chatMsgs){
-            const chatRef = ref.collection('chat').doc();
-            batch.set(chatRef, {
-              text: msg.text,
-              sender: '엑셀 자동등록',
-              timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-          }
+      const ref = db.collection('orders').doc(existing.id);
+      batch.update(ref, patch);
+
+      if(addChat){
+        for(const msg of chatMsgs){
+          const chatRef = ref.collection('chat').doc();
+          batch.set(chatRef, {
+            text: msg.text,
+            sender: '엑셀 자동등록',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
         }
       }
     }
