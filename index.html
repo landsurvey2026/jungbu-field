@@ -522,7 +522,7 @@
 <datalist id="dlLocation"></datalist>
 
 <!-- 제작자 크레딧 + 버전 -->
-<div class="credit">v2.3 · © Seo Young Min</div>
+<div class="credit">v2.4 · © Seo Young Min</div>
 
 <!-- ============== 신규/수정 모달 ============== -->
 <div class="modal" id="formModal">
@@ -642,6 +642,20 @@
             💡 작업지시번호 1, 2, 3... → <code style="font-family:var(--mono); background:#0a121e; padding:2px 6px; border-radius:4px; font-size:10.5px; color:var(--accent)">중부001, 중부002</code>로 자동 변환.<br>
             💡 이미 등록된 지시번호는 <strong>건너뜀</strong>(중복 방지).
           </div>
+        </div>
+      </div>
+
+      <!-- 전체 데이터 삭제 (위험) -->
+      <div class="admin-card" style="border-color:rgba(239,68,68,.5)">
+        <div class="admin-card-head" style="background:rgba(239,68,68,.15); color:#fca5a5">⚠️ 전체 데이터 삭제 (위험)</div>
+        <div class="admin-card-body">
+          <div style="font-size:12px; color:var(--text-dim); line-height:1.6; margin-bottom:12px">
+            ⚠️ <strong style="color:#fca5a5">등록된 모든 공사지시</strong>가 영구 삭제됩니다.<br>
+            엑셀 임포트가 잘못되어 처음부터 다시 하고 싶을 때만 사용하세요.<br>
+            <strong style="color:var(--warn-r)">되돌릴 수 없습니다!</strong>
+          </div>
+          <input id="deleteConfirmText" type="text" placeholder="확인을 위해 '전체삭제' 입력" autocomplete="off" style="margin-bottom:8px">
+          <button class="btn-primary" style="margin:0; width:100%; background:var(--warn-r); color:#fff; border-color:var(--warn-r)" onclick="deleteAllOrders()">🗑️ 모든 공사지시 삭제</button>
         </div>
       </div>
 
@@ -2828,6 +2842,15 @@ document.getElementById('excelImport').addEventListener('change', async (e) => {
           </span>
         </label>
       ` : ''}
+      ${dupRecords.length > 0 ? `
+        <label style="display:flex; align-items:flex-start; gap:8px; margin-bottom:8px; cursor:pointer; padding:10px; background:rgba(251,146,60,.08); border:1px solid rgba(251,146,60,.3); border-radius:6px">
+          <input type="checkbox" id="cbForceSync" style="width:16px; height:16px; cursor:pointer; flex-shrink:0; margin-top:1px">
+          <span style="font-size:12px; color:var(--text); line-height:1.5">
+            🔄 <strong style="color:var(--warn-o)">모든 기존 데이터 강제 재동기화</strong> (${dupRecords.length}건 전부)<br>
+            <span style="color:var(--text-dim); font-size:11px">변경 감지 무시하고 모든 항목을 엑셀 값으로 다시 씁니다 (반영 안 될 때 사용)</span>
+          </span>
+        </label>
+      ` : ''}
       ${(newRecords.length > 0 || updateRecords.length > 0) ? `
         <div style="font-size:11px; color:var(--text-dim); margin-bottom:8px">
           ${newRecords.length > 0 ? `신규: ${newRecords.slice(0, 5).map(r => esc(r.no)).join(', ')}${newRecords.length > 5 ? ' ...' : ''}<br>` : ''}
@@ -2840,8 +2863,22 @@ document.getElementById('excelImport').addEventListener('change', async (e) => {
     if(newRecords.length > 0 || updateRecords.length > 0){
       document.getElementById('btnExcelConfirm').onclick = () => {
         const doUpdate = document.getElementById('cbDoUpdate')?.checked;
-        importToFirestore(newRecords, doUpdate ? updateRecords : [], existingMap, resultDiv);
+        const forceSync = document.getElementById('cbForceSync')?.checked;
+        // 강제 동기화면 모든 dupRecords, 아니면 차이있는 것만
+        const toUpdate = forceSync ? dupRecords : (doUpdate ? updateRecords : []);
+        importToFirestore(newRecords, toUpdate, existingMap, resultDiv);
       };
+    } else if(dupRecords.length > 0){
+      // 변경 감지된 게 없지만 강제 재동기화는 가능 - 별도 버튼 추가
+      const forceBtn = document.createElement('button');
+      forceBtn.className = 'btn-primary';
+      forceBtn.style.cssText = 'margin:8px 0 0; width:100%; background:var(--warn-o); color:#fff; border-color:var(--warn-o)';
+      forceBtn.innerHTML = `🔄 강제 재동기화 (${dupRecords.length}건 전부 엑셀로 덮어쓰기)`;
+      forceBtn.onclick = () => {
+        if(!confirm(`${dupRecords.length}건 전체를 엑셀 값으로 강제 재동기화합니다.\n\n진행상태·날짜 모두 엑셀로 덮어씁니다. 진행할까요?`)) return;
+        importToFirestore([], dupRecords, existingMap, resultDiv);
+      };
+      resultDiv.appendChild(forceBtn);
     }
   }catch(err){
     console.error(err);
@@ -2850,6 +2887,68 @@ document.getElementById('excelImport').addEventListener('change', async (e) => {
     e.target.value = '';  // 같은 파일 다시 선택 가능하게
   }
 });
+
+/* 전체 데이터 삭제 (위험) */
+window.deleteAllOrders = async function(){
+  const inp = document.getElementById('deleteConfirmText');
+  if(!inp || inp.value.trim() !== '전체삭제'){
+    alert('확인 텍스트가 일치하지 않습니다.\n"전체삭제" 를 정확히 입력해주세요.');
+    return;
+  }
+  const count = state.orders.length;
+  if(count === 0){ alert('삭제할 데이터가 없습니다.'); return; }
+  if(!confirm(`정말로 ${count}건의 공사지시를 모두 삭제하시겠습니까?\n\n⚠️ 이 작업은 되돌릴 수 없습니다.`)) return;
+  if(!confirm(`최종 확인: ${count}건이 영구 삭제됩니다.\n\n계속하시겠습니까?`)) return;
+
+  inp.value = '';
+
+  // 진행 UI
+  const card = inp.closest('.admin-card-body');
+  card.innerHTML = `
+    <div style="background:rgba(239,68,68,.1); border-radius:6px; padding:12px">
+      <div style="font-weight:700; color:#fca5a5; margin-bottom:6px">⏳ 삭제 중...</div>
+      <div id="delProg" style="font-family:var(--mono); font-size:13px">0 / ${count}</div>
+      <div style="background:#0a121e; border-radius:4px; height:6px; margin-top:6px; overflow:hidden">
+        <div id="delBar" style="background:var(--warn-r); height:100%; width:0%; transition:width .2s"></div>
+      </div>
+    </div>
+  `;
+
+  let done = 0, failed = 0;
+  const orders = [...state.orders];
+  const chunkSize = 100;
+  for(let i = 0; i < orders.length; i += chunkSize){
+    const chunk = orders.slice(i, i + chunkSize);
+    const batch = db.batch();
+    for(const o of chunk){
+      batch.delete(db.collection('orders').doc(o.id));
+    }
+    try{
+      await batch.commit();
+      done += chunk.length;
+    }catch(e){
+      console.error('삭제 실패:', e);
+      failed += chunk.length;
+    }
+    document.getElementById('delProg').textContent = `${done + failed} / ${count}`;
+    document.getElementById('delBar').style.width = `${(done + failed) / count * 100}%`;
+  }
+
+  showToast({ title:`✓ ${done}건 삭제 완료`, sub: failed ? `${failed}건 실패` : '' });
+
+  // 카드 다시 그리기
+  setTimeout(() => {
+    card.innerHTML = `
+      <div style="background:rgba(16,185,129,.1); border-radius:6px; padding:14px; text-align:center">
+        <div style="font-weight:700; color:var(--accent); margin-bottom:6px">✅ 삭제 완료</div>
+        <div style="font-size:12px; color:var(--text)">
+          ${done}건 삭제됨<br>
+          이제 엑셀을 다시 임포트할 수 있습니다.
+        </div>
+      </div>
+    `;
+  }, 800);
+};
 
 /* 엑셀 시트 → 레코드 배열 변환 */
 function parseExcelSheet(sheet){
