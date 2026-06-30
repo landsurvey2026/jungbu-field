@@ -96,6 +96,8 @@
   .tabs button.tab-alert{position:relative}
   .tabs button.tab-alert.has{border-color:var(--warn-r); color:var(--warn-r)}
   .tabs button.tab-alert.has.on{background:var(--warn-r); border-color:var(--warn-r); color:#fff}
+  .tabs button.tab-partial{border-color:rgba(168,85,247,.4); color:#c4b5fd}
+  .tabs button.tab-partial.on{background:#7c3aed; border-color:#7c3aed; color:#fff}
 
   /* ---------- 알림 배너 (드래그 가능 + 닫기 가능 플로팅 패널) ---------- */
   #alertBar{position:fixed; top:80px; right:14px; z-index:300; width:280px; max-width:calc(100vw - 28px); background:var(--ink2); border:1px solid rgba(239,68,68,.4); border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,.5); display:none; overflow:hidden}
@@ -449,6 +451,8 @@
     <button data-tab="공사완료">공사완료 <span class="cnt" id="c공사완료">0</span></button>
     <button data-tab="측량완료">측량완료 <span class="cnt" id="c측량완료">0</span></button>
     <button data-tab="로딩완료">로딩완료 <span class="cnt" id="c로딩완료">0</span></button>
+    <button data-tab="부분로딩" class="tab-partial">부분로딩 <span class="cnt" id="c부분로딩">0</span></button>
+    <button data-tab="가로딩" class="tab-partial">가로딩 <span class="cnt" id="c가로딩">0</span></button>
     <button data-tab="alert" class="tab-alert" id="tabAlert">⚠ 알림 <span class="cnt" id="cAlert">0</span></button>
   </div>
 
@@ -522,7 +526,7 @@
 <datalist id="dlLocation"></datalist>
 
 <!-- 제작자 크레딧 + 버전 -->
-<div class="credit">v2.4 · © Seo Young Min</div>
+<div class="credit">v2.6 · © Seo Young Min</div>
 
 <!-- ============== 신규/수정 모달 ============== -->
 <div class="modal" id="formModal">
@@ -1277,12 +1281,16 @@ function render(){
 
   // 단계별 카운트 + KPI 계산
   const stageCounts = [0, 0, 0, 0, 0, 0]; // index = stage (0~5)
+  let partialCnt = 0, garoCnt = 0;
   let alerts = 0;
   const alertList = [];
 
   state.orders.forEach(o => {
     const s = getStage(o);
     stageCounts[s]++;
+    // 부분로딩/가로딩 별도 카운트 (origStatus 기반, 단계와 무관)
+    if(o.origStatus === '부분로딩') partialCnt++;
+    else if(o.origStatus === '가로딩') garoCnt++;
     const al = alertLevel(o);
     if(al){ alerts++; alertList.push({order:o, ...al}); }
   });
@@ -1303,6 +1311,8 @@ function render(){
   document.getElementById('c공사완료').textContent = stageCounts[3];
   document.getElementById('c측량완료').textContent = stageCounts[4];
   document.getElementById('c로딩완료').textContent = stageCounts[5];
+  document.getElementById('c부분로딩').textContent = partialCnt;
+  document.getElementById('c가로딩').textContent = garoCnt;
   document.getElementById('cAlert').textContent = alerts;
 
   const tabAlert = document.getElementById('tabAlert');
@@ -1336,11 +1346,15 @@ function render(){
     reopen.classList.remove('show');
   }
 
-  // 탭 필터링 (단계 기반)
+  // 탭 필터링 (단계 기반 + 부분로딩/가로딩 별도)
   const TAB_TO_STAGE = {'공사예정':1, '공사중':2, '공사완료':3, '측량완료':4, '로딩완료':5};
   let filtered = state.orders;
   if(state.currentTab in TAB_TO_STAGE){
     filtered = state.orders.filter(o => getStage(o) === TAB_TO_STAGE[state.currentTab]);
+  } else if(state.currentTab === '부분로딩'){
+    filtered = state.orders.filter(o => o.origStatus === '부분로딩');
+  } else if(state.currentTab === '가로딩'){
+    filtered = state.orders.filter(o => o.origStatus === '가로딩');
   } else if(state.currentTab === 'alert'){
     filtered = alertList.map(a => a.order);
   }
@@ -1418,9 +1432,13 @@ function renderCompactList(filtered){
     const st = STAGE_NAMES[stage];
     const al = alertLevel(o);
     const alClass = al ? `alert-${al.level}` : '';
+    const partialBadge = (o.origStatus === '부분로딩' || o.origStatus === '가로딩')
+      ? `<span class="compact-status" style="background:rgba(124,58,237,.18); color:#c4b5fd; border:1px solid rgba(124,58,237,.4)">${esc(o.origStatus)}</span>`
+      : '';
     return `<div class="compact-row ${alClass}" onclick="openDetail('${o.id}')">
       <span class="compact-no">${esc(o.no||'')}</span>
       <span class="compact-name">${esc(o.name||'(공사명 없음)')}</span>
+      ${partialBadge}
       <span class="compact-status st-${st}">${st}</span>
       ${al ? `<span class="compact-alert ${al.level}">D+${al.days}</span>` : ''}
     </div>`;
@@ -1495,6 +1513,10 @@ function renderCard(o){
   const al = alertLevel(o);
   const alClass = al ? `alert-${al.level}` : '';
   const stClass = `st-${st}`;
+  // 부분로딩/가로딩 뱃지 (origStatus 기반)
+  const partialBadge = (o.origStatus === '부분로딩' || o.origStatus === '가로딩')
+    ? `<span class="card-status" style="background:rgba(124,58,237,.18); color:#c4b5fd; border:1px solid rgba(124,58,237,.4)">${esc(o.origStatus)}</span>`
+    : '';
 
   // 5개 단계 dots
   const dotsHtml = [1,2,3,4,5].map(i => {
@@ -1511,6 +1533,7 @@ function renderCard(o){
   return `<div class="card ${alClass}" onclick="openDetail('${o.id}')">
     <div class="card-head">
       <span class="card-no">${esc(o.no||'')}</span>
+      ${partialBadge}
       <span class="card-status ${stClass}">${st}</span>
     </div>
     <div class="card-name">${esc(o.name||'(공사명 없음)')}</div>
@@ -1850,6 +1873,7 @@ function renderDetail(o){
         ${stageRowHtml(2, '공사중', o)}
         ${stageRowHtml(3, '공사완료', o)}
         ${stageRowHtml(4, '측량완료', o)}
+        ${partialLoadingRow(o)}
         ${stageRowHtml(5, '로딩완료', o)}
         ${getStage(o) > 0 ? `<button class="stage-reset" onclick="resetStage('${o.id}')">↺ 단계 초기화 (등록 상태로)</button>` : ''}
       </div>
@@ -1957,6 +1981,66 @@ function toggleRow(field, label, checked, date){
     <input type="date" class="toggle-date" data-field="${field}" value="${date||''}" ${checked?'':'disabled'}>
   </div>`;
 }
+
+/* 부분로딩/가로딩 선택 UI - 측량완료(4단계) 이상에서만 활성 */
+function partialLoadingRow(o){
+  const stage = getStage(o);
+  const enabled = stage >= 4;
+  const cur = o.origStatus || '';
+  const isPartial = cur === '부분로딩';
+  const isGaroDing = cur === '가로딩';
+  const dimStyle = enabled ? '' : 'opacity:.45; cursor:not-allowed';
+
+  return `<div class="stage-row" style="background:rgba(124,58,237,.06); border:1px dashed rgba(124,58,237,.4); ${dimStyle}">
+    <div style="width:28px; height:28px; border-radius:50%; background:rgba(124,58,237,.18); color:#c4b5fd; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0">📌</div>
+    <div class="stage-label" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; flex:1">
+      <span>부분로딩 / 가로딩 표시</span>
+      <span style="font-size:10px; color:var(--text-dim); font-weight:500">측량완료 이후 선택 가능</span>
+    </div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap">
+      <button type="button" onclick="setPartialStatus('${o.id}','부분로딩')" ${enabled?'':'disabled'}
+        style="padding:6px 12px; border-radius:6px; border:1px solid ${isPartial?'#7c3aed':'rgba(124,58,237,.4)'}; background:${isPartial?'#7c3aed':'transparent'}; color:${isPartial?'#fff':'#c4b5fd'}; font-size:12px; font-weight:600; cursor:${enabled?'pointer':'not-allowed'}">
+        부분로딩
+      </button>
+      <button type="button" onclick="setPartialStatus('${o.id}','가로딩')" ${enabled?'':'disabled'}
+        style="padding:6px 12px; border-radius:6px; border:1px solid ${isGaroDing?'#7c3aed':'rgba(124,58,237,.4)'}; background:${isGaroDing?'#7c3aed':'transparent'}; color:${isGaroDing?'#fff':'#c4b5fd'}; font-size:12px; font-weight:600; cursor:${enabled?'pointer':'not-allowed'}">
+        가로딩
+      </button>
+      ${(isPartial||isGaroDing) ? `<button type="button" onclick="setPartialStatus('${o.id}','')" style="padding:6px 12px; border-radius:6px; border:1px dashed var(--line); background:transparent; color:var(--text-dim); font-size:12px; cursor:pointer">✕ 해제</button>` : ''}
+    </div>
+  </div>`;
+}
+
+/* 부분로딩/가로딩 설정 (origStatus 필드만 변경) */
+window.setPartialStatus = async function(orderId, status){
+  const o = state.orders.find(x => x.id === orderId);
+  if(!o) return;
+  const stage = getStage(o);
+  if(stage < 4 && status){
+    alert('🚫 부분로딩/가로딩은 측량완료 단계 이상에서만 표시할 수 있습니다.');
+    return;
+  }
+  try{
+    await db.collection('orders').doc(orderId).update({
+      origStatus: status,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: state.user.name
+    });
+    showToast({ title: status ? `✓ ${status} 표시됨` : '✓ 표시 해제됨' });
+
+    // 채팅에 기록 남기기
+    if(status){
+      await db.collection('orders').doc(orderId).collection('chat').add({
+        text: `📌 [${status}] 표시 설정됨`,
+        sender: state.user.name,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  }catch(e){
+    console.error(e);
+    alert('변경 실패: ' + e.message);
+  }
+};
 
 /* 단계 설정 — 순차 진행: 누른 단계까지는 완료, 그 이후는 미완료 */
 window.setStage = async function(orderId, newStage){
@@ -2255,81 +2339,165 @@ async function exportToExcel(){
 
   try{
     const sname = siteName();
+    const prefix = state.prefix || '중부';
     const wb = new ExcelJS.Workbook();
     wb.creator = sname;
     wb.created = new Date();
-    const ws = wb.addWorksheet('공사지시 현황', {
-      properties:{ defaultRowHeight: 22 },
-      views:[{ state:'frozen', ySplit: 4 }]
+
+    // ==========================================================
+    // 시트: 신설(중부) - 일일보고서 원본 양식과 동일한 컬럼 위치
+    // ==========================================================
+    const ws = wb.addWorksheet(`신설(${prefix})`, {
+      properties:{ defaultRowHeight: 18 },
+      views:[{ state:'frozen', ySplit: 8 }]
     });
 
-    // ============= 제목 (병합 + 큰 글씨) =============
-    ws.mergeCells('A1:M1');
-    const titleCell = ws.getCell('A1');
-    titleCell.value = `서울시 ${sname} 공사지시 현황`;
-    titleCell.font = { name:'맑은 고딕', size:16, bold:true, color:{argb:'FF0D1117'} };
-    titleCell.alignment = { horizontal:'center', vertical:'middle' };
-    titleCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD1FAE5'} };
-    ws.getRow(1).height = 34;
-
-    // ============= 부제목 =============
-    ws.mergeCells('A2:M2');
     const today = new Date();
     const dStr = today.getFullYear()+'.'+String(today.getMonth()+1).padStart(2,'0')+'.'+String(today.getDate()).padStart(2,'0');
+    const dStrCompact = dStr.replace(/\./g,'');
+
+    // ============= Row 1: 메인 타이틀 =============
+    ws.mergeCells('A1:AC1');
+    const titleCell = ws.getCell('A1');
+    titleCell.value = '정확도 개선사업 관리대장 (신설)';
+    titleCell.font = { name:'맑은 고딕', size:16, bold:true, color:{argb:'FF1F2937'} };
+    titleCell.alignment = { horizontal:'center', vertical:'middle' };
+    titleCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE0F2F1'} };
+    ws.getRow(1).height = 32;
+
+    // ============= Row 2: 사업소/출력일/건수 =============
+    ws.mergeCells('A2:AC2');
     const subCell = ws.getCell('A2');
-    subCell.value = `출력일: ${dStr}     |     총 ${state.orders.length}건     |     출력자: ${state.user.name}     |     지시번호 순 정렬`;
-    subCell.font = { name:'맑은 고딕', size:10, color:{argb:'FF555555'} };
+    subCell.value = `사업소: 서울시 ${sname}     |     출력일: ${dStr}     |     총 ${state.orders.length}건     |     출력자: ${state.user.name}`;
     subCell.alignment = { horizontal:'center', vertical:'middle' };
-    ws.getRow(2).height = 20;
+    subCell.font = { name:'맑은 고딕', size:10, color:{argb:'FF4B5563'} };
+    ws.getRow(2).height = 22;
 
-    // 3행 비움
-    ws.getRow(3).height = 8;
+    // Row 3-7 : 단계별 통계 (간단 요약)
+    ws.mergeCells('A3:AC3');
+    const stats = {
+      미시공: 0, 공사예정: 0, 공사중: 0, 공사완료: 0,
+      측량완료: 0, 부분로딩: 0, 가로딩: 0, 로딩완료: 0
+    };
+    state.orders.forEach(o => {
+      const st = (o.origStatus && ['부분로딩','가로딩'].includes(o.origStatus)) ? o.origStatus : orderStatus(o);
+      if(stats[st] !== undefined) stats[st]++;
+      else stats.미시공++;
+    });
+    const statsLine = Object.entries(stats).map(([k,v]) => `${k} ${v}건`).join('  |  ');
+    const statsCell = ws.getCell('A3');
+    statsCell.value = `[ ${statsLine} ]`;
+    statsCell.alignment = { horizontal:'center', vertical:'middle' };
+    statsCell.font = { name:'맑은 고딕', size:9.5, color:{argb:'FF6B7280'} };
+    ws.getRow(3).height = 20;
 
-    // ============= 헤더 =============
-    const headers = ['지시번호','공사지시일','공사명','공사위치','소장명','전화번호','공사연장(m)','공사예정일','공사완료일','준공도 인수일','로딩 완료일','최종연장(m)','진행상태'];
-    const headerRow = ws.getRow(4);
-    headerRow.values = headers;
-    headerRow.height = 28;
-    headerRow.eachCell((cell) => {
-      cell.font = { name:'맑은 고딕', size:11, bold:true, color:{argb:'FFFFFFFF'} };
-      cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF10B981'} };
+    // Row 4-7 비움 (원본 양식 호환 - 향후 다른 정보 들어갈 자리)
+    for(let r=4; r<=7; r++) ws.getRow(r).height = 14;
+
+    // ============= Row 8: 컬럼 헤더 (원본 위치와 동일) =============
+    const headerCells = {
+      1:  '사업소',
+      2:  '작업\n지시번호',
+      4:  '공사\n종류',
+      5:  '공사명 + 위치',
+      7:  '연장\n(m)',
+      16: '착공일',
+      17: '준공일',
+      19: '측량\n지시일',
+      24: '공사\n진행현황',
+      25: '현장\n연락처',
+      26: '완료일\n(로딩완료일)',
+      28: '자료\n인수일',
+      29: '현장\n특이사항'
+    };
+    const headerRow = ws.getRow(8);
+    Object.entries(headerCells).forEach(([col, val]) => {
+      const cell = headerRow.getCell(parseInt(col));
+      cell.value = val;
+      cell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FFFFFFFF'} };
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF374151'} };
       cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
       cell.border = {
-        top:    { style:'medium', color:{argb:'FF065F46'} },
-        bottom: { style:'medium', color:{argb:'FF065F46'} },
-        left:   { style:'thin',   color:{argb:'FF065F46'} },
-        right:  { style:'thin',   color:{argb:'FF065F46'} }
+        top:    { style:'medium', color:{argb:'FF1F2937'} },
+        bottom: { style:'medium', color:{argb:'FF1F2937'} },
+        left:   { style:'thin',   color:{argb:'FF1F2937'} },
+        right:  { style:'thin',   color:{argb:'FF1F2937'} }
       };
     });
+    headerRow.height = 38;
 
-    // ============= 데이터 (지시번호 오름차순 정렬) =============
-    const fmtD = (s) => s ? s.replace(/-/g,'.') : '';
+    // ============= 유틸 =============
+    // 상태 역매핑: 시스템 단계 → 엑셀 진행상태 (원본 origStatus 우선)
+    const reverseStatus = (o) => {
+      const orig = o.origStatus;
+      const stage = getStage(o);
+      // origStatus가 있고 단계와 일치하면 그대로 (round-trip)
+      if(orig === '로딩완료' && stage === 5) return '로딩완료';
+      if((orig === '가로딩' || orig === '부분로딩') && stage === 4) return orig;
+      if(orig === '공사완료' && stage === 3) return '공사완료';
+      if(orig === '공사중' && stage === 2) return '공사중';
+      if(orig === '미시공' && stage <= 1) return '미시공';
+      // 기본 매핑 (시스템 단계 → 엑셀 양식 상태)
+      if(stage === 5) return '로딩완료';
+      if(stage === 4) return '측량완료';
+      if(stage === 3) return '공사완료';
+      if(stage === 2) return '공사중';
+      if(stage === 1) return '공사예정';
+      return '미시공';
+    };
+
+    // 작업지시번호 역매핑: 중부001 → 1
+    const reverseNo = (no) => {
+      if(!no) return '';
+      const m = String(no).match(/(\d+)$/);
+      return m ? parseInt(m[1]) : no;
+    };
+
+    // 공사명 + 위치 결합
+    const combineName = (o) => {
+      if(o.name && o.location) return `${o.name}, ${o.location}`;
+      return o.name || o.location || '';
+    };
+
+    // ISO 문자열 → Date 객체 (엑셀 날짜로 정확히 인식되게)
+    const toDate = (s) => {
+      if(!s) return null;
+      const d = new Date(s);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    // ============= 데이터 (지시번호 자연 정렬) =============
     const sortedOrders = [...state.orders].sort((a,b) => naturalCompare(a.no, b.no));
+
     sortedOrders.forEach((o, i) => {
-      const row = ws.getRow(5 + i);
-      row.values = [
-        o.no || '',
-        fmtD(o.instructionDate),
-        o.name || '',
-        o.location || '',
-        o.bossName || '',
-        formatPhone(o.bossPhone) || '',
-        o.length ? Number(o.length) : '',
-        fmtD(o.plannedDate || o.startDate),
-        fmtD(o.completedDate || o.endDate),
-        fmtD(o.drawingReceivedDate),
-        fmtD(o.loadingDoneDate),
-        o.finalLength ? Number(o.finalLength) : '',
-        orderStatus(o)
-      ];
+      const rowIdx = 9 + i;
+      const row = ws.getRow(rowIdx);
+
+      row.getCell(1).value  = prefix;                                              // A: 사업소
+      row.getCell(2).value  = reverseNo(o.no);                                     // B: 작업지시번호
+      row.getCell(4).value  = '신규';                                               // D: 공사종류
+      row.getCell(5).value  = combineName(o);                                      // E: 공사명+위치
+      if(o.length) row.getCell(7).value = Number(o.length);                        // G: 연장
+      row.getCell(16).value = toDate(o.plannedDate || o.startDate);                // P: 착공일
+      row.getCell(17).value = toDate(o.completedDate || o.endDate);                // Q: 준공일
+      row.getCell(19).value = toDate(o.instructionDate);                           // S: 측량지시일
+      row.getCell(24).value = reverseStatus(o);                                    // X: 진행상태
+      const phoneFmt = formatPhone(o.bossPhone);
+      row.getCell(25).value = `${o.bossName || ''} ${phoneFmt}`.trim();            // Y: 현장연락처
+      row.getCell(26).value = toDate(o.loadingDoneDate);                           // Z: 완료일(로딩완료일)
+      row.getCell(28).value = toDate(o.drawingReceivedDate);                       // AB: 자료인수일
+      row.getCell(29).value = o.siteNotes || '';                                   // AC: 현장특이사항
+
       row.height = 24;
 
-      row.eachCell((cell, colNum) => {
-        cell.font = { name:'맑은 고딕', size:10.5 };
-        cell.alignment = { vertical:'middle', wrapText:true,
-          horizontal: [1,5,6,13].includes(colNum) ? 'center' :
-                      [7,12].includes(colNum) ? 'right' :
-                      [2,8,9,10,11].includes(colNum) ? 'center' : 'left' };
+      // 데이터 컬럼만 스타일 적용
+      const dataCols = [1,2,4,5,7,16,17,19,24,25,26,28,29];
+      dataCols.forEach(c => {
+        const cell = row.getCell(c);
+        cell.font = cell.font || { name:'맑은 고딕', size:10 };
+        if(!cell.font.name) cell.font.name = '맑은 고딕';
+        if(!cell.font.size) cell.font.size = 10;
+        cell.alignment = { vertical:'middle', wrapText:true };
         cell.border = {
           top:    { style:'thin', color:{argb:'FFD1D5DB'} },
           bottom: { style:'thin', color:{argb:'FFD1D5DB'} },
@@ -2342,40 +2510,67 @@ async function exportToExcel(){
         }
       });
 
-      // 공사연장 / 최종연장: 천 단위 구분 포맷
-      row.getCell(7).numFmt = '#,##0.##';
-      row.getCell(12).numFmt = '#,##0.##';
+      // 가운데 정렬: 사업소·지시번호·종류·날짜·진행상태
+      [1, 2, 4, 16, 17, 19, 24, 26, 28].forEach(c => {
+        row.getCell(c).alignment = { vertical:'middle', wrapText:true, horizontal:'center' };
+      });
+      // 우측 정렬: 연장(m)
+      row.getCell(7).alignment = { vertical:'middle', wrapText:true, horizontal:'right' };
 
-      // 상태별 색깔
-      const st = orderStatus(o);
-      const stCell = row.getCell(13);
-      if(st === '로딩완료')      stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF059669'} };
-      else if(st === '측량완료') stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF7C3AED'} };
-      else if(st === '공사완료') stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF0891B2'} };
-      else if(st === '공사중')   stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FFEA580C'} };
-      else if(st === '공사예정') stCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF2563EB'} };
-      else                        stCell.font = { name:'맑은 고딕', size:10.5, color:{argb:'FF6B7280'} };
+      // 날짜 포맷
+      [16, 17, 19, 26, 28].forEach(c => {
+        const cell = row.getCell(c);
+        if(cell.value instanceof Date) cell.numFmt = 'yyyy-mm-dd';
+      });
 
-      // 지시번호는 진한 녹색
-      row.getCell(1).font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF065F46'} };
+      // 연장 천단위
+      row.getCell(7).numFmt = '#,##0';
 
-      // 알림 임박이면 인수일 빨간색
+      // 작업지시번호 굵게
+      row.getCell(2).font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF065F46'} };
+
+      // 진행상태 색상
+      const st = row.getCell(24).value;
+      const stCell = row.getCell(24);
+      if(st === '로딩완료')                          stCell.font = { name:'맑은 고딕', size:10, bold:true, color:{argb:'FF059669'} };
+      else if(st === '부분로딩' || st === '가로딩')  stCell.font = { name:'맑은 고딕', size:10, bold:true, color:{argb:'FF7C3AED'} };
+      else if(st === '측량완료')                     stCell.font = { name:'맑은 고딕', size:10, bold:true, color:{argb:'FF9333EA'} };
+      else if(st === '공사완료')                     stCell.font = { name:'맑은 고딕', size:10, bold:true, color:{argb:'FF0891B2'} };
+      else if(st === '공사중')                       stCell.font = { name:'맑은 고딕', size:10, bold:true, color:{argb:'FFEA580C'} };
+      else if(st === '공사예정')                     stCell.font = { name:'맑은 고딕', size:10, bold:true, color:{argb:'FF2563EB'} };
+      else                                          stCell.font = { name:'맑은 고딕', size:10, color:{argb:'FF6B7280'} };
+
+      // 알림 임박 자료인수일 강조
       const al = alertLevel(o);
       if(al){
-        const dCell = row.getCell(10);
-        if(al.level==='위험') dCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FFDC2626'} };
-        else if(al.level==='경고') dCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FFEA580C'} };
-        else if(al.level==='주의') dCell.font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FFCA8A04'} };
+        const dCell = row.getCell(28);
+        if(al.level==='위험')      dCell.font = { name:'맑은 고딕', size:10, bold:true, color:{argb:'FFDC2626'} };
+        else if(al.level==='경고') dCell.font = { name:'맑은 고딕', size:10, bold:true, color:{argb:'FFEA580C'} };
+        else if(al.level==='주의') dCell.font = { name:'맑은 고딕', size:10, bold:true, color:{argb:'FFCA8A04'} };
       }
     });
 
     // ============= 열 너비 =============
-    const widths = [13, 12, 30, 24, 11, 16, 12, 13, 13, 14, 14, 12, 11];
-    widths.forEach((w, i) => ws.getColumn(i+1).width = w);
+    const widths = {
+      1: 8,    // 사업소
+      2: 10,   // 작업지시번호
+      4: 9,    // 공사종류
+      5: 48,   // 공사명+위치
+      7: 9,    // 연장
+      16: 12,  // 착공일
+      17: 12,  // 준공일
+      19: 12,  // 측량지시일
+      24: 11,  // 진행상태
+      25: 20,  // 연락처
+      26: 13,  // 완료일
+      28: 13,  // 자료인수일
+      29: 32   // 특이사항
+    };
+    Object.entries(widths).forEach(([c, w]) => ws.getColumn(parseInt(c)).width = w);
 
     // ============= 푸터 =============
-    const lastRow = 5 + state.orders.length + 1;
-    ws.mergeCells(`A${lastRow}:M${lastRow}`);
+    const lastRow = 9 + state.orders.length + 1;
+    ws.mergeCells(`A${lastRow}:AC${lastRow}`);
     const footCell = ws.getCell(`A${lastRow}`);
     footCell.value = `※ 본 자료는 ${dStr} 시점의 현장관리 시스템 데이터입니다. (서울시 ${sname})`;
     footCell.font = { name:'맑은 고딕', size:9, italic:true, color:{argb:'FF999999'} };
@@ -2387,13 +2582,13 @@ async function exportToExcel(){
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${sname}_공사지시현황_${dStr.replace(/\./g,'')}.xlsx`;
+    a.download = `일일보고서_${dStrCompact}_${prefix}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    showToast({ title:'✓ 엑셀 파일 생성 완료', sub: `${state.orders.length}건 내보내기 완료` });
+    showToast({ title:'✓ 일일보고서 형식 엑셀 생성 완료', sub: `${state.orders.length}건 (신설(${prefix}) 시트)` });
   }catch(e){
     console.error(e);
     alert('엑셀 생성 실패: ' + e.message);
@@ -2803,13 +2998,13 @@ document.getElementById('excelImport').addEventListener('change', async (e) => {
       const existing = existingMap.get(r.no);
       // 엑셀 status 데이터가 기존과 다르면 동기화 대상
       const dateChanged = (f) => r[f] && r[f] !== (existing[f] || '');
-      if(dateChanged('loadedDate')) return true;
+      if(dateChanged('loadingDoneDate')) return true;
       if(dateChanged('drawingReceivedDate')) return true;
       if(dateChanged('instructionDate')) return true;
       if(dateChanged('plannedDate')) return true;
       if(dateChanged('completedDate')) return true;
       // 단계 플래그가 다르면 (예: 엑셀은 로딩완료지만 기존은 측량완료)
-      if(!!r.loaded !== !!existing.loaded) return true;
+      if(!!r.loadingDone !== !!existing.loadingDone) return true;
       if(!!r.drawingReceived !== !!existing.drawingReceived) return true;
       if(!!r.surveyed !== !!existing.surveyed) return true;
       if(!!r.completed !== !!existing.completed) return true;
@@ -3032,12 +3227,13 @@ function parseExcelSheet(sheet){
       length: parseFloat(g) || 0,
       bossName, bossPhone,
       instructionDate,
+      siteNotes,                // AC열 (현장특이사항) - 내보내기 라운드트립용
       // 단계 기본값
       planned: false, plannedDate: '',
       inProgress: false, inProgressDate: '',
       completed: false, completedDate: '',
       surveyed: false, surveyedDate: '',
-      loaded: false, loadedDate: '',
+      loadingDone: false, loadingDoneDate: '',
       drawingReceived: false, drawingReceivedDate: '',
       // 구버전 호환
       startDate: plannedDate, endDate: completedDate,
@@ -3070,8 +3266,8 @@ function parseExcelSheet(sheet){
       rec.completed = true; rec.completedDate = completedDate || ''; rec.endDate = rec.completedDate;
       rec.surveyed = true; rec.surveyedDate = completedDate || '';
       // Z열을 로딩완료일로 사용 (없으면 인수일 → 준공일 폴백)
-      rec.loaded = true;
-      rec.loadedDate = loadedDate || drawingDate || completedDate || '';
+      rec.loadingDone = true;
+      rec.loadingDoneDate = loadedDate || drawingDate || completedDate || '';
     }
 
     // AB열 (준공도 인수일) 은 진행상태와 무관하게 항상 적용
@@ -3166,14 +3362,14 @@ async function importToFirestore(newRecords, updateRecords, existingMap, resultD
       patch.inProgress = !!r.inProgress;
       patch.completed = !!r.completed;
       patch.surveyed = !!r.surveyed;
-      patch.loaded = !!r.loaded;
+      patch.loadingDone = !!r.loadingDone;
       patch.drawingReceived = !!r.drawingReceived;
       // 단계 날짜
       if(r.plannedDate){ patch.plannedDate = r.plannedDate; patch.startDate = r.plannedDate; }
       if(r.inProgressDate) patch.inProgressDate = r.inProgressDate;
       if(r.completedDate){ patch.completedDate = r.completedDate; patch.endDate = r.completedDate; }
       if(r.surveyedDate) patch.surveyedDate = r.surveyedDate;
-      if(r.loadedDate) patch.loadedDate = r.loadedDate;
+      if(r.loadingDoneDate) patch.loadingDoneDate = r.loadingDoneDate;
       if(r.drawingReceivedDate) patch.drawingReceivedDate = r.drawingReceivedDate;
       // 공사지시일도 엑셀 우선
       if(r.instructionDate) patch.instructionDate = r.instructionDate;
