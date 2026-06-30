@@ -286,6 +286,7 @@
   .tool-btn.export:active{background:var(--accent-dim)}
   .btn-view{display:inline-block}
   .sort-sel{appearance:menulist; min-width:120px; cursor:pointer; padding-right:8px}
+  #hideLoadedBtn[data-active="true"]{background:var(--accent); color:#04231a; border-color:var(--accent)}
 
   /* 모바일에서는 "표" 버튼만 숨김 (테이블은 가로 스크롤 필요해서 모바일 부적합) */
   @media (max-width: 767px){
@@ -465,6 +466,7 @@
     <button class="tool-btn btn-view on" data-view="card">📋 카드</button>
     <button class="tool-btn btn-view" data-view="compact">📜 간단</button>
     <button class="tool-btn btn-view" data-view="table">📊 표</button>
+    <button class="tool-btn" id="hideLoadedBtn" data-active="false" title="로딩완료 숨기기 (부분로딩/가로딩 제외)">🔕 로딩완료</button>
     <button class="tool-btn export" id="btnExport">📥 엑셀</button>
   </div>
 
@@ -520,7 +522,7 @@
 <datalist id="dlLocation"></datalist>
 
 <!-- 제작자 크레딧 + 버전 -->
-<div class="credit">v2.1 · © Seo Young Min</div>
+<div class="credit">v2.2 · © Seo Young Min</div>
 
 <!-- ============== 신규/수정 모달 ============== -->
 <div class="modal" id="formModal">
@@ -738,6 +740,7 @@ const state = {
   searchQuery: '',          // 검색어
   viewMode: 'card',         // 'card' | 'compact' | 'table'
   sortBy: 'instDate-desc',  // 'instDate-desc' | 'instDate-asc' | 'no-asc' | 'no-desc'
+  hideLoaded: false,        // 로딩완료 숨기기 (부분로딩/가로딩은 제외)
   configLoaded: false,
   passwords: { app: null, admin: null, url: null },
   prefix: '중부'              // 지시번호 자동 접두어 (관리자가 변경 가능)
@@ -1343,6 +1346,11 @@ function render(){
   // 정렬 적용 (공사지시일 우선, 없으면 createdAt 폴백)
   filtered = sortOrders(filtered, state.sortBy);
 
+  // 로딩완료 숨기기 (단, 부분로딩/가로딩은 제외 - 이건 stage 4 라서 그대로 보임)
+  if(state.hideLoaded){
+    filtered = filtered.filter(o => getStage(o) !== 5);
+  }
+
   // 보기 모드에 따라 분기
   if(state.viewMode === 'table'){
     renderTable(filtered);
@@ -1544,13 +1552,32 @@ document.getElementById('sortSel').addEventListener('change', (e) => {
   render();
 });
 
-/* 저장된 정렬 모드 복원 */
+/* 로딩완료 숨기기 토글 */
+document.getElementById('hideLoadedBtn').addEventListener('click', () => {
+  state.hideLoaded = !state.hideLoaded;
+  const btn = document.getElementById('hideLoadedBtn');
+  btn.dataset.active = state.hideLoaded ? 'true' : 'false';
+  btn.textContent = state.hideLoaded ? '🔔 로딩완료 보이기' : '🔕 로딩완료';
+  localStorage.setItem('jungbu_hideLoaded', state.hideLoaded ? '1' : '0');
+  render();
+});
+
+/* 저장된 정렬 모드 및 숨기기 모드 복원 */
 (function(){
-  const saved = localStorage.getItem('jungbu_sortBy');
-  if(saved){
-    state.sortBy = saved;
+  const savedSort = localStorage.getItem('jungbu_sortBy');
+  if(savedSort){
+    state.sortBy = savedSort;
     const sel = document.getElementById('sortSel');
-    if(sel) sel.value = saved;
+    if(sel) sel.value = savedSort;
+  }
+  const savedHide = localStorage.getItem('jungbu_hideLoaded');
+  if(savedHide === '1'){
+    state.hideLoaded = true;
+    const btn = document.getElementById('hideLoadedBtn');
+    if(btn){
+      btn.dataset.active = 'true';
+      btn.textContent = '🔔 로딩완료 보이기';
+    }
   }
 })();
 
@@ -2762,12 +2789,14 @@ document.getElementById('excelImport').addEventListener('change', async (e) => {
       const existing = existingMap.get(r.no);
       // 다음 필드 중 하나라도 기존에 없는데 새로 들어오면 업데이트 대상
       return (r.drawingReceivedDate && !existing.drawingReceivedDate)
+          || (r.loadedDate && !existing.loadedDate)
           || (r.instructionDate && !existing.instructionDate)
           || (r.plannedDate && !existing.plannedDate)
           || (r.completedDate && !existing.completedDate)
           || (r.bossName && !existing.bossName)
           || (r.bossPhone && !existing.bossPhone)
-          || (r.length > 0 && !existing.length);
+          || (r.length > 0 && !existing.length)
+          || (r.chatMessages && r.chatMessages.length > 0 && !existing.excelChatAdded);
     });
 
     // 미리보기 출력
@@ -2825,7 +2854,9 @@ function parseExcelSheet(sheet){
     const s = row.getCell(19).value;  // 측량지시일
     const x = row.getCell(24).value;  // 진행상태
     const y = row.getCell(25).value;  // 현장연락처
-    const ab = row.getCell(28).value; // 자료인수일
+    const z = row.getCell(26).value;  // 완료일 = 로딩완료일
+    const ab = row.getCell(28).value; // 자료인수일 = 준공도 인수일
+    const ac = row.getCell(29).value; // 현장특이사항
 
     // 지시번호 없거나 숫자 아니면 스킵 (소계/합계 등)
     const num = parseInt(b);
@@ -2876,10 +2907,14 @@ function parseExcelSheet(sheet){
     const plannedDate = toDate(p);   // 착공일
     const completedDate = toDate(q); // 준공일
     const instructionDate = toDate(s); // 측량지시일
-    const drawingDate = toDate(ab);  // 자료인수일
+    const loadedDate = toDate(z);     // Z열 = 로딩완료일
+    const drawingDate = toDate(ab);   // 자료인수일
+    const siteNotes = ac ? String(ac).trim() : ''; // AC열 = 현장특이사항
 
     // 진행상태 → 단계 매핑
     const state_str = String(x||'').trim();
+    const chatMsgs = []; // 자동 메모/채팅 메시지
+
     const rec = {
       no, name, location,
       length: parseFloat(g) || 0,
@@ -2908,16 +2943,23 @@ function parseExcelSheet(sheet){
       rec.inProgress = true; rec.inProgressDate = plannedDate || '';
       rec.completed = true; rec.completedDate = completedDate || ''; rec.endDate = rec.completedDate;
     } else if(state_str === '가로딩' || state_str === '부분로딩'){
+      // 부분로딩/가로딩은 측량완료(4단계)까지 진행, 로딩완료 아님
       rec.planned = true; rec.plannedDate = plannedDate || ''; rec.startDate = rec.plannedDate;
       rec.inProgress = true; rec.inProgressDate = plannedDate || '';
       rec.completed = true; rec.completedDate = completedDate || ''; rec.endDate = rec.completedDate;
       rec.surveyed = true; rec.surveyedDate = completedDate || '';
+      // 채팅 메시지: 부분로딩 진행 상태 기록
+      chatMsgs.push({
+        text: `📌 [${state_str}] ${loadedDate ? '부분로딩 일자: ' + loadedDate.replace(/-/g,'.') : '부분 로딩 진행 중'} (엑셀 자동 등록)`
+      });
     } else if(state_str === '로딩완료'){
       rec.planned = true; rec.plannedDate = plannedDate || ''; rec.startDate = rec.plannedDate;
       rec.inProgress = true; rec.inProgressDate = plannedDate || '';
       rec.completed = true; rec.completedDate = completedDate || ''; rec.endDate = rec.completedDate;
       rec.surveyed = true; rec.surveyedDate = completedDate || '';
-      rec.loaded = true; rec.loadedDate = drawingDate || completedDate || '';
+      // Z열을 로딩완료일로 사용 (없으면 인수일 → 준공일 폴백)
+      rec.loaded = true;
+      rec.loadedDate = loadedDate || drawingDate || completedDate || '';
     }
 
     // AB열 (준공도 인수일) 은 진행상태와 무관하게 항상 적용
@@ -2925,6 +2967,16 @@ function parseExcelSheet(sheet){
       rec.drawingReceived = true;
       rec.drawingReceivedDate = drawingDate;
     }
+
+    // AC열 (현장특이사항) - 있으면 채팅에 자동 기록
+    if(siteNotes){
+      chatMsgs.push({
+        text: `📋 [현장 특이사항] ${siteNotes}`
+      });
+    }
+
+    // 채팅 메시지 첨부 (있을때만)
+    if(chatMsgs.length > 0) rec.chatMessages = chatMsgs;
 
     records.push(rec);
   }
@@ -2949,19 +3001,32 @@ async function importToFirestore(newRecords, updateRecords, existingMap, resultD
   const barEl = document.getElementById('impBar');
 
   // --- 신규 등록 (배치 100건씩) ---
-  const chunkSize = 100;
+  const chunkSize = 80;  // 채팅 메시지도 함께 쓰니까 한 행당 최대 3 ops, 80*3=240 으로 안전
   for(let i = 0; i < newRecords.length; i += chunkSize){
     const chunk = newRecords.slice(i, i + chunkSize);
     const batch = db.batch();
     for(const r of chunk){
       const ref = db.collection('orders').doc();
+      const chatMsgs = r.chatMessages || [];
+      const recCopy = {...r};
+      delete recCopy.chatMessages;
       batch.set(ref, {
-        ...r,
+        ...recCopy,
+        excelChatAdded: chatMsgs.length > 0,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         createdBy: state.user.name + ' (엑셀)',
         updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedBy: state.user.name + ' (엑셀)'
       });
+      // 채팅 메시지 추가 (있을때만)
+      for(const msg of chatMsgs){
+        const chatRef = ref.collection('chat').doc();
+        batch.set(chatRef, {
+          text: msg.text,
+          sender: '엑셀 자동등록',
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
     }
     try{
       await batch.commit();
@@ -2987,6 +3052,10 @@ async function importToFirestore(newRecords, updateRecords, existingMap, resultD
         patch.drawingReceived = true;
         patch.drawingReceivedDate = r.drawingReceivedDate;
       }
+      if(r.loadedDate && !existing.loadedDate){
+        patch.loadedDate = r.loadedDate;
+        if(r.loaded) patch.loaded = true;
+      }
       if(r.instructionDate && !existing.instructionDate) patch.instructionDate = r.instructionDate;
       if(r.plannedDate && !existing.plannedDate){
         patch.plannedDate = r.plannedDate;
@@ -3002,11 +3071,27 @@ async function importToFirestore(newRecords, updateRecords, existingMap, resultD
       if(r.length > 0 && !existing.length) patch.length = r.length;
       if(r.location && !existing.location) patch.location = r.location;
 
-      if(Object.keys(patch).length > 0){
+      // 채팅 메시지가 있고 아직 추가된 적 없으면 추가
+      const chatMsgs = r.chatMessages || [];
+      const addChat = chatMsgs.length > 0 && !existing.excelChatAdded;
+
+      if(Object.keys(patch).length > 0 || addChat){
         patch.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
         patch.updatedBy = state.user.name + ' (엑셀 보완)';
+        if(addChat) patch.excelChatAdded = true;
         const ref = db.collection('orders').doc(existing.id);
         batch.update(ref, patch);
+
+        if(addChat){
+          for(const msg of chatMsgs){
+            const chatRef = ref.collection('chat').doc();
+            batch.set(chatRef, {
+              text: msg.text,
+              sender: '엑셀 자동등록',
+              timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+          }
+        }
       }
     }
     try{
