@@ -535,7 +535,7 @@
 <datalist id="dlCompany"></datalist>
 
 <!-- 제작자 크레딧 + 버전 -->
-<div class="credit">v3.0 · © Seo Young Min</div>
+<div class="credit">v3.1 · © Seo Young Min</div>
 
 <!-- ============== 신규/수정 모달 ============== -->
 <div class="modal" id="formModal">
@@ -582,6 +582,23 @@
         <label>👷 컨소시엄 (현장팀) <span style="color:var(--text-dim); font-weight:400; font-size:10.5px">(시공 담당 팀)</span></label>
         <input id="fCompany" list="dlCompany" placeholder="예: 삼아, 삼인, 올포랜드1팀..." autocomplete="off" maxlength="30">
       </div>
+      <details style="background:rgba(148,163,184,.05); border:1px solid rgba(148,163,184,.2); border-radius:8px; padding:10px 12px; margin-bottom:14px">
+        <summary style="cursor:pointer; font-size:12px; color:var(--text-dim); font-weight:600">🏗 현장 관리 정보 (선택) — 열어서 입력</summary>
+        <div style="margin-top:12px">
+          <div class="field-row">
+            <div class="field"><label>25년 지시번호</label><input id="fNo25" placeholder="예: OP-2025-042" autocomplete="off"></div>
+            <div class="field"><label>지시연번</label><input id="fInstSeq" placeholder="예: 3구간" autocomplete="off"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>구경 (mm)</label><input id="fDiameter" placeholder="예: 100" autocomplete="off"></div>
+            <div class="field"><label>주/야 구분</label><input id="fDayNight" placeholder="예: 주간" autocomplete="off"></div>
+          </div>
+          <div class="field"><label>공사번호</label><input id="fConstNo" placeholder="예: 2025-A-127" autocomplete="off"></div>
+          <div class="field"><label>심사구분</label><input id="fInspection" placeholder="예: 표준" autocomplete="off"></div>
+          <div class="field"><label>비고</label><input id="fRemark" placeholder="비고 사항" autocomplete="off"></div>
+          <div class="field"><label>현장특이사항</label><input id="fSiteNotes" placeholder="현장에서 유의할 특이사항" autocomplete="off"></div>
+        </div>
+      </details>
       <div style="background:rgba(16,185,129,.06); border:1px solid rgba(16,185,129,.2); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:11.5px; color:var(--text-dim); line-height:1.6">
         💡 <strong style="color:var(--accent)">작업기간(공사예정일·공사완료일)</strong>은 상세보기의 <strong style="color:var(--accent)">공사 진행</strong> 단계에서 입력합니다.<br>
         여기서는 기본정보만 등록하세요.
@@ -1744,6 +1761,14 @@ function openForm(order){
   document.getElementById('fPhone').value = order?.bossPhone ? formatPhone(order.bossPhone) : '';
   document.getElementById('fLen').value = order?.length ? formatNumber(order.length) : '';
   document.getElementById('fCompany').value = order?.company || '';
+  document.getElementById('fNo25').value = order?.no25 || '';
+  document.getElementById('fInstSeq').value = order?.instSeq || '';
+  document.getElementById('fDiameter').value = order?.diameter || '';
+  document.getElementById('fDayNight').value = order?.dayNight || '';
+  document.getElementById('fConstNo').value = order?.constNo || '';
+  document.getElementById('fInspection').value = order?.inspection || '';
+  document.getElementById('fRemark').value = order?.remark || '';
+  document.getElementById('fSiteNotes').value = order?.siteNotes || '';
   document.getElementById('fNoWarn').classList.remove('show');
   document.getElementById('fNoPreview').style.display = 'none';
   document.getElementById('formModal').classList.add('show');
@@ -1885,6 +1910,14 @@ document.getElementById('fSave').onclick = async () => {
     bossPhone: document.getElementById('fPhone').value.trim(),
     length: parseNumber(document.getElementById('fLen').value),
     company: document.getElementById('fCompany').value.trim(),
+    no25: document.getElementById('fNo25').value.trim(),
+    instSeq: document.getElementById('fInstSeq').value.trim(),
+    diameter: document.getElementById('fDiameter').value.trim(),
+    dayNight: document.getElementById('fDayNight').value.trim(),
+    constNo: document.getElementById('fConstNo').value.trim(),
+    inspection: document.getElementById('fInspection').value.trim(),
+    remark: document.getElementById('fRemark').value.trim(),
+    siteNotes: document.getElementById('fSiteNotes').value.trim(),
     instructionDate: document.getElementById('fInstDate').value || '',
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: state.user.name
@@ -1992,25 +2025,33 @@ function renderDetail(o){
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-head"><span class="ic">🚚</span> 로딩 마감 관리 (전산팀 실적)</div>
+    <div class="section" style="border:2px solid rgba(245,158,11,.4); background:rgba(245,158,11,.05); border-radius:10px">
+      <div class="section-head" style="background:rgba(245,158,11,.12); color:#fbbf24"><span class="ic">☁️</span> 전산팀 입력 영역 <span style="margin-left:auto; font-size:11px; color:var(--text-dim); font-weight:500">우리가 입력</span></div>
       <div class="section-body">
         <label style="display:flex; align-items:center; gap:10px; padding:12px; background:${o.itLoaded ? 'rgba(56,189,248,.15)' : 'rgba(56,189,248,.05)'}; border:2px solid ${o.itLoaded ? 'rgba(56,189,248,.5)' : 'rgba(56,189,248,.2)'}; border-radius:10px; cursor:pointer; margin-bottom:12px; transition:all .15s">
           <input type="checkbox" id="dItLoaded" ${o.itLoaded ? 'checked' : ''} style="width:20px; height:20px; cursor:pointer; accent-color:#38bdf8">
           <div style="flex:1">
             <div style="font-weight:700; color:#38bdf8; font-size:14px">☁️ 전산 로딩 완료</div>
-            <div style="font-size:11px; color:var(--text-dim); margin-top:2px">우리 전산팀이 로딩한 건 (체크 시 메인화면 카드가 하늘색으로 표시됨)</div>
+            <div style="font-size:11px; color:var(--text-dim); margin-top:2px">체크 시 메인화면 카드가 하늘색으로 표시됨</div>
           </div>
         </label>
         <div class="field" style="margin-bottom:10px">
-          <label>📏 실연장 (m) <span style="color:var(--text-dim); font-size:11px">— 실측 로딩(적재) 길이</span></label>
+          <label>📏 실연장 (m) <span style="color:var(--text-dim); font-size:11px">— 편집연장 = 로딩연장</span></label>
           <input type="number" step="0.1" id="dFinalLen" value="${o.finalLength||''}" placeholder="예: 42.0">
         </div>
         <button class="btn-ghost" style="margin-top:4px" onclick="saveFinalLen('${o.id}')">💾 실연장 저장</button>
         <div style="font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5">
-          💡 이 값이 엑셀 내보내기 시 <strong>편집(N열)과 로딩(O열)</strong> 두 곳에 동일하게 기입됩니다.
+          💡 실연장 → 엑셀 <strong>N열(편집) + O열(로딩)</strong> 두 곳에 동일 기입<br>
+          💡 로딩완료일, 준공도 인수 여부/일자는 위 <strong>공사 진행</strong>·<strong>준공도</strong> 섹션에서 입력
         </div>
         ${countdownHtml}
+      </div>
+    </div>
+
+    <div class="section" style="background:rgba(148,163,184,.05); border:1px solid rgba(148,163,184,.2); border-radius:10px">
+      <div class="section-head" style="background:rgba(148,163,184,.08); color:#94a3b8"><span class="ic">🏗</span> 현장 관리 정보 <span style="margin-left:auto; font-size:11px; color:var(--text-dim); font-weight:500">엑셀에서 자동 갱신 · 읽기 전용</span></div>
+      <div class="section-body">
+        ${renderSiteInfo(o)}
       </div>
     </div>
 
@@ -2075,6 +2116,57 @@ function renderDetail(o){
   // 채팅 입력 엔터
   const ci = document.getElementById('chatInput');
   if(ci) ci.addEventListener('keydown', e => { if(e.key==='Enter') sendChat(); });
+}
+
+/* 🏗 현장 관리 정보 렌더 (읽기 전용) */
+function renderSiteInfo(o){
+  const items = [];
+  // 지시번호 정보
+  if(o.no25) items.push({ ic:'🏷', k:'25년 지시번호', v:o.no25 });
+  if(o.instSeq) items.push({ ic:'📍', k:'지시연번', v:o.instSeq });
+  if(o.constNo) items.push({ ic:'🔖', k:'공사번호', v:o.constNo });
+  if(o.inspection) items.push({ ic:'⚖️', k:'심사구분', v:o.inspection });
+  // 공사 스펙
+  if(o.diameter) items.push({ ic:'📏', k:'구경', v:o.diameter });
+  if(o.dayNight) items.push({ ic:'🕐', k:'주/야 구분', v:o.dayNight });
+  // 현장팀
+  if(o.company) items.push({ ic:'👷', k:'컨소담당(현장팀)', v:o.company, hl:true });
+  // 진행 관련
+  if(o.progressCheck) items.push({ ic:'✅', k:'진행사항확인', v:o.progressCheck });
+  if(o.blockedType) items.push({ ic:'🚫', k:'진행불가유형', v:o.blockedType, warn:true });
+  // 비고 / 특이사항
+  if(o.remark) items.push({ ic:'📝', k:'비고', v:o.remark, full:true });
+  if(o.siteNotes) items.push({ ic:'💬', k:'현장특이사항', v:o.siteNotes, full:true });
+
+  // 추진실적 (I~M열) - 하나라도 있으면 별도 블록
+  const perfHas = o.perfActual || o.perfTotal || o.perfSurvey || o.perfDetect || o.perfUndetect || o.perfMeasure;
+
+  if(items.length === 0 && !perfHas){
+    return '<div style="font-size:12px; color:var(--text-dim); text-align:center; padding:12px">📭 엑셀 임포트 시 자동으로 채워집니다.</div>';
+  }
+
+  const rows = items.map(it => `
+    <div class="info-row" style="${it.full?'flex-direction:column; align-items:flex-start; gap:4px':''}">
+      <div class="k">${it.ic} ${it.k}</div>
+      <div class="v" style="${it.hl?'color:#a5b4fc; font-weight:700':''}${it.warn?';color:#fca5a5':''}">${esc(it.v)}</div>
+    </div>
+  `).join('');
+
+  const perfBlock = perfHas ? `
+    <div style="margin-top:10px; padding:10px 12px; background:rgba(56,189,248,.06); border:1px solid rgba(56,189,248,.2); border-radius:8px">
+      <div style="font-size:12px; font-weight:700; color:#7dd3fc; margin-bottom:6px">📊 추진실적 (m)</div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(80px, 1fr)); gap:6px; font-size:11.5px">
+        ${o.perfActual ? `<div><span style="color:var(--text-dim)">공사실적:</span> <strong>${esc(o.perfActual)}</strong></div>` : ''}
+        ${o.perfTotal ? `<div><span style="color:var(--text-dim)">계:</span> <strong>${Number(o.perfTotal).toLocaleString()}</strong></div>` : ''}
+        ${o.perfSurvey ? `<div><span style="color:var(--text-dim)">조사:</span> <strong>${Number(o.perfSurvey).toLocaleString()}</strong></div>` : ''}
+        ${o.perfDetect ? `<div><span style="color:var(--text-dim)">탐사:</span> <strong>${Number(o.perfDetect).toLocaleString()}</strong></div>` : ''}
+        ${o.perfUndetect ? `<div><span style="color:var(--text-dim)">불탐:</span> <strong>${Number(o.perfUndetect).toLocaleString()}</strong></div>` : ''}
+        ${o.perfMeasure ? `<div><span style="color:var(--text-dim)">측량:</span> <strong>${Number(o.perfMeasure).toLocaleString()}</strong></div>` : ''}
+      </div>
+    </div>
+  ` : '';
+
+  return rows + perfBlock;
 }
 
 /* 단계 행 HTML 생성 */
@@ -2666,21 +2758,26 @@ async function exportToExcel(){
 
       row.getCell(1).value  = prefix;                                     // A: 사업소
       row.getCell(2).value  = reverseNo(o.no);                            // B: 작업지시번호
-      // C: 작업지시번호(25년) — 비워둠
+      if(o.no25) row.getCell(3).value = o.no25;                          // C: 작업지시번호(25년)
       row.getCell(4).value  = '신규';                                      // D: 공사종류
       row.getCell(5).value  = combineName(o);                             // E: 공사명+위치
-      // F: 구경 — 비워둠 (시스템에서 추적 안 함)
+      if(o.diameter) row.getCell(6).value = o.diameter;                  // F: 구경
       if(o.length) row.getCell(7).value = Number(o.length);              // G: 연장
-      // H~M: 공사실적/계/조사/탐사/불탐/측량 — 비워둠 (개별 공사 단위 데이터 없음)
-      if(o.finalLength) row.getCell(14).value = Number(o.finalLength);    // N: 편집 (실연장과 동일)
-      if(o.finalLength) row.getCell(15).value = Number(o.finalLength);    // O: 로딩 실연장(m)
+      if(o.perfActual) row.getCell(8).value = o.perfActual;              // H: 공사실적
+      if(o.perfTotal) row.getCell(9).value = Number(o.perfTotal);        // I: 계
+      if(o.perfSurvey) row.getCell(10).value = Number(o.perfSurvey);     // J: 조사
+      if(o.perfDetect) row.getCell(11).value = Number(o.perfDetect);     // K: 탐사
+      if(o.perfUndetect) row.getCell(12).value = Number(o.perfUndetect); // L: 불탐
+      if(o.perfMeasure) row.getCell(13).value = Number(o.perfMeasure);   // M: 측량
+      if(o.finalLength) row.getCell(14).value = Number(o.finalLength);   // N: 편집 (실연장과 동일)
+      if(o.finalLength) row.getCell(15).value = Number(o.finalLength);   // O: 로딩 실연장(m)
       row.getCell(16).value = toDate(o.plannedDate || o.startDate);       // P: 착공일
       row.getCell(17).value = toDate(o.completedDate || o.endDate);       // Q: 준공일
       // R: 측량의뢰일 — 비워둠
       row.getCell(19).value = toDate(o.instructionDate);                  // S: 측량지시일
-      // T: 공사번호 — 비워둠
-      // U: 비고 — 비워둠
-      // V: 심사구분 — 비워둠
+      if(o.constNo) row.getCell(20).value = o.constNo;                   // T: 공사번호
+      if(o.remark) row.getCell(21).value = o.remark;                     // U: 비고
+      if(o.inspection) row.getCell(22).value = o.inspection;             // V: 심사구분
       if(o.drawingReceived) row.getCell(23).value = '●';                 // W: 자료인수구분 (인수됨 표시)
       row.getCell(24).value = reverseStatus(o);                           // X: 공사진행현황
       const phoneFmt = formatPhone(o.bossPhone);
@@ -2689,8 +2786,11 @@ async function exportToExcel(){
       if(o.drawingReceived) row.getCell(27).value = '●';                 // AA: 자료인수현황
       row.getCell(28).value = toDate(o.drawingReceivedDate);              // AB: 자료인수일
       row.getCell(29).value = o.siteNotes || '';                          // AC: 현장특이사항
-      // AD~AG: 비워둠
-      if(o.company) row.getCell(34).value = o.company;                    // AH: 컨소담당 (업체)
+      if(o.dayNight) row.getCell(30).value = o.dayNight;                 // AD: 주야구분
+      if(o.instSeq) row.getCell(31).value = o.instSeq;                   // AE: 지시연번
+      if(o.progressCheck) row.getCell(32).value = o.progressCheck;      // AF: 진행사항확인
+      if(o.blockedType) row.getCell(33).value = o.blockedType;          // AG: 진행불가유형
+      if(o.company) row.getCell(34).value = o.company;                    // AH: 컨소담당 (현장팀)
 
       row.height = 24;
 
@@ -2714,10 +2814,10 @@ async function exportToExcel(){
       [1, 2, 3, 4, 16, 17, 18, 19, 23, 24, 26, 27, 28].forEach(c => {
         row.getCell(c).alignment = { vertical:'middle', wrapText:true, horizontal:'center' };
       });
-      // 우측 정렬: 연장(m), 편집(N), 로딩(O)
-      row.getCell(7).alignment = { vertical:'middle', wrapText:true, horizontal:'right' };
-      row.getCell(14).alignment = { vertical:'middle', wrapText:true, horizontal:'right' };
-      row.getCell(15).alignment = { vertical:'middle', wrapText:true, horizontal:'right' };
+      // 우측 정렬: 연장(G), 추진실적(I~M), 편집(N), 로딩(O)
+      [7, 9, 10, 11, 12, 13, 14, 15].forEach(c => {
+        row.getCell(c).alignment = { vertical:'middle', wrapText:true, horizontal:'right' };
+      });
 
       // 날짜 포맷
       [16, 17, 18, 19, 26, 28].forEach(c => {
@@ -2725,10 +2825,10 @@ async function exportToExcel(){
         if(cell.value instanceof Date) cell.numFmt = 'yyyy-mm-dd';
       });
 
-      // 연장 천단위 (연장 G, 편집 N, 로딩 O)
-      row.getCell(7).numFmt = '#,##0.0';
-      row.getCell(14).numFmt = '#,##0.0';
-      row.getCell(15).numFmt = '#,##0.0';
+      // 숫자 천단위 (G연장, I~O 추진실적/편집/로딩)
+      [7, 9, 10, 11, 12, 13, 14, 15].forEach(c => {
+        row.getCell(c).numFmt = '#,##0.0';
+      });
 
       // 편집(N) / 로딩(O) 값이 있으면 녹색 강조 (같은 값)
       if(o.finalLength){
@@ -2770,38 +2870,38 @@ async function exportToExcel(){
     const widths = {
       1: 7,    // A 사업소
       2: 8,    // B 지시번호
-      3: 8,    // C 25년
+      3: 10,   // C 25년
       4: 8,    // D 종류
       5: 38,   // E 공사명
-      6: 7,    // F 구경
-      7: 9,    // G 연장
-      8: 9,    // H 실적
+      6: 8,    // F 구경
+      7: 10,   // G 연장
+      8: 10,   // H 실적
       9: 8,    // I 계
       10: 8,   // J 조사
       11: 8,   // K 탐사
       12: 8,   // L 불탐
       13: 8,   // M 측량
-      14: 8,   // N 편집
-      15: 8,   // O 로딩
-      16: 11,  // P 착공
-      17: 11,  // Q 준공
-      18: 10,  // R 측량의뢰
-      19: 11,  // S 측량지시
+      14: 10,  // N 편집
+      15: 10,  // O 로딩
+      16: 13,  // P 착공
+      17: 13,  // Q 준공
+      18: 13,  // R 측량의뢰
+      19: 13,  // S 측량지시
       20: 14,  // T 공사번호
       21: 12,  // U 비고
-      22: 8,   // V 심사
+      22: 9,   // V 심사
       23: 8,   // W 자료인수구분
-      24: 11,  // X 진행현황
-      25: 18,  // Y 연락처
-      26: 11,  // Z 완료일
+      24: 12,  // X 진행현황
+      25: 20,  // Y 연락처
+      26: 13,  // Z 완료일
       27: 9,   // AA 인수현황
-      28: 11,  // AB 인수일
-      29: 28,  // AC 특이사항
+      28: 13,  // AB 인수일
+      29: 30,  // AC 특이사항
       30: 8,   // AD 주야
-      31: 7,   // AE 연번
-      32: 12,  // AF 진행확인
-      33: 8,   // AG 불가유형
-      34: 12   // AH 컨소담당
+      31: 10,  // AE 연번
+      32: 13,  // AF 진행확인
+      33: 10,  // AG 불가유형
+      34: 14   // AH 컨소담당
     };
     Object.entries(widths).forEach(([c, w]) => ws.getColumn(parseInt(c)).width = w);
 
@@ -3450,34 +3550,53 @@ document.getElementById('excelImport').addEventListener('change', async (e) => {
     const newRecords = records.filter(r => !existingMap.has(r.no));
     const dupRecords = records.filter(r => existingMap.has(r.no));
 
-    // ⚠️ 정책 변경 (v3.0): 기존 데이터는 절대 손대지 않음 - 신규 지시번호만 추가
-    const updateRecords = [];  // 사용 안 함
+    // 🏗 현장 관리 필드들 (엑셀에서만 관리 - 항상 엑셀 값으로 갱신)
+    const SITE_FIELDS = ['no25','diameter','perfActual','perfTotal','perfSurvey','perfDetect','perfUndetect','perfMeasure','constNo','remark','inspection','dayNight','instSeq','progressCheck','blockedType','siteNotes','company'];
+    // ☁️ 전산 관리 필드들 (앱에서만 관리 - 절대 덮어쓰지 않음)
+    // = loadingDone / loadingDoneDate / drawingReceived / drawingReceivedDate / finalLength / itLoaded / itLoadedDate
+
+    // 기존 지시들 중 현장 필드가 새로 추가/변경된 것 찾기
+    const mergeRecords = dupRecords.filter(r => {
+      const existing = existingMap.get(r.no);
+      for(const f of SITE_FIELDS){
+        const oldVal = existing[f] || '';
+        const newVal = r[f] || '';
+        // 값이 있고 기존과 다르면 병합 대상
+        if(newVal && String(newVal) !== String(oldVal)) return true;
+        // 숫자 필드는 0 → 값 채우기
+        if(typeof newVal === 'number' && newVal > 0 && !oldVal) return true;
+      }
+      return false;
+    });
 
     // 미리보기 출력
     resultDiv.innerHTML = `
       <div style="background:rgba(16,185,129,.08); border:1px solid rgba(16,185,129,.3); border-radius:6px; padding:10px; margin-bottom:8px">
         <div style="font-weight:700; color:var(--accent); margin-bottom:4px">📋 ${esc(sheetName)} 시트 분석 완료</div>
-        <div style="font-size:11.5px; color:var(--text)">
+        <div style="font-size:11.5px; color:var(--text); line-height:1.6">
           ▶ 총 데이터: <strong>${records.length}건</strong><br>
-          ▶ 🆕 신규 추가 대상: <strong style="color:var(--accent)">${newRecords.length}건</strong><br>
-          ▶ ✔ 이미 등록됨 (건너뜀): <strong style="color:var(--text-dim)">${dupRecords.length}건</strong>
+          ▶ 🆕 신규 등록 대상: <strong style="color:var(--accent)">${newRecords.length}건</strong><br>
+          ▶ 🔄 기존 지시 현장정보 갱신: <strong style="color:#60a5fa">${mergeRecords.length}건</strong><br>
+          ▶ ✔ 변경 없음: <strong style="color:var(--text-dim)">${dupRecords.length - mergeRecords.length}건</strong>
         </div>
       </div>
       <div style="background:rgba(96,165,250,.08); border:1px solid rgba(96,165,250,.3); border-radius:6px; padding:10px; margin-bottom:10px; font-size:11.5px; color:var(--text); line-height:1.6">
-        ℹ️ <strong>임포트 정책</strong>: 기존에 등록된 지시번호는 <strong style="color:#fbbf24">건드리지 않고</strong>, 엑셀에 새로 추가된 지시번호만 등록합니다.<br>
-        진행상태·연장·연락처·현장특이사항 등 앱에서 관리하는 값들이 <strong>절대 덮어써지지 않습니다</strong>.
+        ℹ️ <strong>임포트 정책 (v3.1)</strong>:<br>
+        • <strong style="color:#fbbf24">☁️ 전산팀 입력 필드는 절대 덮어쓰지 않음</strong>: 실연장 · 로딩완료(일) · 준공도인수(일) · 전산로딩 체크<br>
+        • <strong style="color:#60a5fa">🏗 현장 관리 필드는 항상 엑셀 우선</strong>: 컨소담당 · 현장특이사항 · 주야 · 지시연번 · 심사구분 · 구경 · 공사번호 · 추진실적(조사/탐사/불탐/측량) 등
       </div>
-      ${newRecords.length > 0 ? `
+      ${(newRecords.length > 0 || mergeRecords.length > 0) ? `
         <div style="font-size:11px; color:var(--text-dim); margin-bottom:8px">
-          신규: ${newRecords.slice(0, 10).map(r => esc(r.no)).join(', ')}${newRecords.length > 10 ? ` ... 외 ${newRecords.length - 10}건` : ''}
+          ${newRecords.length > 0 ? `신규: ${newRecords.slice(0, 8).map(r => esc(r.no)).join(', ')}${newRecords.length > 8 ? ` ... 외 ${newRecords.length - 8}건` : ''}<br>` : ''}
+          ${mergeRecords.length > 0 ? `현장정보 갱신: ${mergeRecords.slice(0, 8).map(r => esc(r.no)).join(', ')}${mergeRecords.length > 8 ? ` ... 외 ${mergeRecords.length - 8}건` : ''}` : ''}
         </div>
-        <button class="btn-primary" style="margin:0; width:100%" id="btnExcelConfirm">🚀 신규 ${newRecords.length}건 등록</button>
-      ` : '<div style="color:var(--text-dim); font-size:12px; text-align:center; padding:12px">✓ 신규 지시번호가 없습니다. 임포트할 항목 없음.</div>'}
+        <button class="btn-primary" style="margin:0; width:100%" id="btnExcelConfirm">🚀 실행 (신규 ${newRecords.length}건 + 갱신 ${mergeRecords.length}건)</button>
+      ` : '<div style="color:var(--text-dim); font-size:12px; text-align:center; padding:12px">✓ 신규 또는 갱신할 항목이 없습니다.</div>'}
     `;
 
-    if(newRecords.length > 0){
+    if(newRecords.length > 0 || mergeRecords.length > 0){
       document.getElementById('btnExcelConfirm').onclick = () => {
-        importToFirestore(newRecords, [], existingMap, resultDiv);
+        importToFirestore(newRecords, mergeRecords, existingMap, resultDiv);
       };
     }
   }catch(err){
@@ -3559,18 +3678,33 @@ function parseExcelSheet(sheet){
   for(let r = 9; r <= sheet.rowCount; r++){
     const row = sheet.getRow(r);
     const b = row.getCell(2).value;   // 작업지시번호
+    const c = row.getCell(3).value;   // 작업지시번호(25년)
     const e = row.getCell(5).value;   // 공사명+위치
+    const f = row.getCell(6).value;   // F: 구경
     const g = row.getCell(7).value;   // 연장
+    const h = row.getCell(8).value;   // H: 공사실적
+    const i = row.getCell(9).value;   // I: 계
+    const j = row.getCell(10).value;  // J: 조사
+    const k = row.getCell(11).value;  // K: 탐사
+    const l = row.getCell(12).value;  // L: 불탐
+    const m = row.getCell(13).value;  // M: 측량
     const oCell = row.getCell(15).value; // O열: 로딩 실연장 (=실연장)
     const p = row.getCell(16).value;  // 착공
     const q = row.getCell(17).value;  // 준공
     const s = row.getCell(19).value;  // 측량지시일
+    const t = row.getCell(20).value;  // T: 공사번호
+    const u = row.getCell(21).value;  // U: 비고
+    const v = row.getCell(22).value;  // V: 심사구분
     const x = row.getCell(24).value;  // 진행상태
     const y = row.getCell(25).value;  // 현장연락처
     const z = row.getCell(26).value;  // 완료일 = 로딩완료일
     const ab = row.getCell(28).value; // 자료인수일 = 준공도 인수일
     const ac = row.getCell(29).value; // 현장특이사항
-    const ah = row.getCell(34).value; // 컨소담당 (업체)
+    const ad = row.getCell(30).value; // AD: 주/야
+    const ae = row.getCell(31).value; // AE: 지시연번
+    const af = row.getCell(32).value; // AF: 진행사항확인
+    const ag = row.getCell(33).value; // AG: 진행불가유형
+    const ah = row.getCell(34).value; // AH: 컨소담당 (현장팀)
 
     // 지시번호 없거나 숫자 아니면 스킵 (소계/합계 등)
     const num = parseInt(b);
@@ -3626,6 +3760,22 @@ function parseExcelSheet(sheet){
     const siteNotes = ac ? String(ac).trim() : ''; // AC열 = 현장특이사항
     const company = ah ? String(ah).trim() : '';   // AH열 = 컨소담당 (현장팀)
     const loadLength = parseFloat(oCell) || 0;     // O열 = 실연장(m)
+    // 현장 관리 필드들 (엑셀에서만 옴)
+    const no25 = c ? String(c).trim() : '';        // C열 = 25년 지시번호
+    const diameter = f ? String(f).trim() : '';    // F열 = 구경
+    const perfActual = h ? String(h).trim() : ''; // H열 = 공사실적
+    const perfTotal = parseFloat(i) || 0;          // I열 = 계(m)
+    const perfSurvey = parseFloat(j) || 0;         // J열 = 조사(m)
+    const perfDetect = parseFloat(k) || 0;         // K열 = 탐사(m)
+    const perfUndetect = parseFloat(l) || 0;       // L열 = 불탐(m)
+    const perfMeasure = parseFloat(m) || 0;        // M열 = 측량(m)
+    const constNo = t ? String(t).trim() : '';     // T열 = 공사번호
+    const remark = u ? String(u).trim() : '';      // U열 = 비고
+    const inspection = v ? String(v).trim() : ''; // V열 = 심사구분
+    const dayNight = ad ? String(ad).trim() : ''; // AD열 = 주야구분
+    const instSeq = ae ? String(ae).trim() : '';  // AE열 = 지시연번
+    const progressCheck = af ? String(af).trim() : ''; // AF열 = 진행사항확인
+    const blockedType = ag ? String(ag).trim() : '';   // AG열 = 진행불가유형
 
     // 진행상태 → 단계 매핑
     const state_str = String(x||'').trim();
@@ -3636,11 +3786,16 @@ function parseExcelSheet(sheet){
       length: parseFloat(g) || 0,
       bossName, bossPhone,
       instructionDate,
-      siteNotes,                // AC열 (현장특이사항) - 내보내기 라운드트립용
+      siteNotes,                // AC열 (현장특이사항)
       company,                  // AH열 (컨소담당 = 현장팀)
       finalLength: loadLength,  // O열 (실연장) - N/O 둘 다 같은 값 사용
       itLoaded: false,          // ☁️ 전산 로딩 (신규 임포트는 미체크)
       itLoadedDate: '',
+      // 🏗 현장 관리 필드들
+      no25, diameter, perfActual,
+      perfTotal, perfSurvey, perfDetect, perfUndetect, perfMeasure,
+      constNo, remark, inspection,
+      dayNight, instSeq, progressCheck, blockedType,
       // 단계 기본값
       planned: false, plannedDate: '',
       inProgress: false, inProgressDate: '',
@@ -3769,38 +3924,29 @@ async function importToFirestore(newRecords, updateRecords, existingMap, resultD
       if(!existing) continue;
       const patch = {};
 
-      // ==== status 관련 필드는 항상 엑셀 값으로 동기화 (엑셀이 진실의 원천) ====
-      // 단계 플래그
-      patch.planned = !!r.planned;
-      patch.inProgress = !!r.inProgress;
-      patch.completed = !!r.completed;
-      patch.surveyed = !!r.surveyed;
-      patch.loadingDone = !!r.loadingDone;
-      patch.drawingReceived = !!r.drawingReceived;
-      // 단계 날짜
-      if(r.plannedDate){ patch.plannedDate = r.plannedDate; patch.startDate = r.plannedDate; }
-      if(r.inProgressDate) patch.inProgressDate = r.inProgressDate;
-      if(r.completedDate){ patch.completedDate = r.completedDate; patch.endDate = r.completedDate; }
-      if(r.surveyedDate) patch.surveyedDate = r.surveyedDate;
-      if(r.loadingDoneDate) patch.loadingDoneDate = r.loadingDoneDate;
-      if(r.drawingReceivedDate) patch.drawingReceivedDate = r.drawingReceivedDate;
-      // 공사지시일도 엑셀 우선
-      if(r.instructionDate) patch.instructionDate = r.instructionDate;
+      // ==== 🏗 현장 관리 필드는 항상 엑셀 우선 (덮어쓰기) ====
+      const SITE_FIELDS_MERGE = ['no25','diameter','perfActual','perfTotal','perfSurvey','perfDetect','perfUndetect','perfMeasure','constNo','remark','inspection','dayNight','instSeq','progressCheck','blockedType','siteNotes','company'];
+      for(const f of SITE_FIELDS_MERGE){
+        if(r[f] !== undefined && r[f] !== '' && r[f] !== 0){
+          patch[f] = r[f];
+        }
+      }
 
-      // ==== 앱 정보 필드는 누락된 경우에만 채움 (사용자 수정 보존) ====
+      // ==== 기본 정보 필드는 앱에 없을 때만 채움 (사용자 수정 보존) ====
       if(r.bossName && !existing.bossName) patch.bossName = r.bossName;
       if(r.bossPhone && !existing.bossPhone) patch.bossPhone = r.bossPhone;
       if(r.length > 0 && !existing.length) patch.length = r.length;
       if(r.location && !existing.location) patch.location = r.location;
-      if(r.company && !existing.company) patch.company = r.company;
-      if(r.finalLength > 0 && !existing.finalLength) patch.finalLength = r.finalLength;
+
+      // ==== ☁️ 전산팀 필드는 절대 덮어쓰지 않음 ====
+      // (loadingDone/loadingDoneDate/drawingReceived/drawingReceivedDate/finalLength/itLoaded/itLoadedDate)
 
       // 채팅 메시지 (특이사항·부분로딩 기록) - 한 번만 추가
       const chatMsgs = r.chatMessages || [];
       const addChat = chatMsgs.length > 0 && !existing.excelChatAdded;
 
       patch.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
-      patch.updatedBy = state.user.name + ' (엑셀 동기화)';
+      patch.updatedBy = state.user.name + ' (엑셀 현장정보 갱신)';
       if(addChat) patch.excelChatAdded = true;
 
       const ref = db.collection('orders').doc(existing.id);
