@@ -290,6 +290,7 @@
   .sort-sel{appearance:menulist; min-width:120px; cursor:pointer; padding-right:8px}
   #hideLoadedBtn[data-active="true"]{background:var(--accent); color:#04231a; border-color:var(--accent)}
   #onlyLoadedBtn[data-active="true"]{background:#7c3aed; color:#fff; border-color:#7c3aed}
+  #onlyOursBtn[data-active="true"]{background:#f59e0b; color:#1a1300; border-color:#f59e0b}
 
   /* 모바일에서는 "표" 버튼만 숨김 (테이블은 가로 스크롤 필요해서 모바일 부적합) */
   @media (max-width: 767px){
@@ -473,6 +474,7 @@
     <button class="tool-btn btn-view" data-view="table">📊 표</button>
     <button class="tool-btn" id="hideLoadedBtn" data-active="false" title="로딩완료 숨기기 (부분로딩/가로딩 제외)">🔕 로딩완료</button>
     <button class="tool-btn" id="onlyLoadedBtn" data-active="false" title="로딩된 것만 보기 (로딩완료+부분로딩+가로딩)">🚚 로딩만</button>
+    <button class="tool-btn" id="onlyOursBtn" data-active="false" title="우리 회사 작업분만 보기">🏢 우리만</button>
     <button class="tool-btn export" id="btnExport">📥 엑셀</button>
   </div>
 
@@ -528,7 +530,7 @@
 <datalist id="dlLocation"></datalist>
 
 <!-- 제작자 크레딧 + 버전 -->
-<div class="credit">v2.7 · © Seo Young Min</div>
+<div class="credit">v2.8 · © Seo Young Min</div>
 
 <!-- ============== 신규/수정 모달 ============== -->
 <div class="modal" id="formModal">
@@ -691,6 +693,20 @@
         </div>
       </div>
 
+      <!-- 우리 회사 설정 -->
+      <div class="admin-card" style="border-color:rgba(245,158,11,.4)">
+        <div class="admin-card-head" style="background:rgba(245,158,11,.12); color:#fbbf24">🏢 우리 회사 설정</div>
+        <div class="admin-card-body">
+          <input id="adminOurCompany" type="text" placeholder="예: 올포랜드, 삼아, 삼인..." autocomplete="off" maxlength="30">
+          <button class="btn-primary" style="margin-top:8px; background:#f59e0b; color:#1a1300; border-color:#f59e0b" onclick="saveOurCompany()">💾 우리 회사 저장</button>
+          <div style="font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5">
+            현재 설정: <code style="font-family:var(--mono); color:#fbbf24" id="adminOurCompanyCur">―</code><br>
+            💡 입력한 키워드가 포함된 회사명을 모두 "우리 회사"로 인식 (예: <strong>올포랜드</strong> 입력 → 올포랜드1팀, 올포랜드_M, 올포랜드_G, 올포랜드_N 모두 매칭).<br>
+            💡 임포트한 데이터의 컨소담당 분포: <span id="companyStats" style="color:var(--accent)">―</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 관리자 비밀번호 -->
       <div class="admin-card">
         <div class="admin-card-head">🔐 관리자 비밀번호</div>
@@ -741,7 +757,7 @@ const firebaseConfig = {
 };
 
 /* 접속 비밀번호 — 사업소 내부에서만 공유하세요 ⬇️ 이 부분만 본인이 정한 비밀번호로 바꾸세요 */
-const APP_PASSWORD = "j2026";
+const APP_PASSWORD = "여기에비밀번호입력";
 
 /* ============================================================
    2. 상태 & 유틸
@@ -762,13 +778,15 @@ const state = {
   sortBy: 'instDate-desc',  // 'instDate-desc' | 'instDate-asc' | 'no-asc' | 'no-desc'
   hideLoaded: false,        // 로딩완료 숨기기 (부분로딩/가로딩은 제외)
   onlyLoaded: false,        // 로딩된 것만 보기 (로딩완료+부분로딩+가로딩)
+  onlyOurs: false,          // 우리 회사 작업분만 보기
+  ourCompany: '',           // 우리 회사 키워드 (관리자 설정)
   configLoaded: false,
   passwords: { app: null, admin: null, url: null },
   prefix: '중부'              // 지시번호 자동 접두어 (관리자가 변경 가능)
 };
 
 /* 기본 비밀번호 (Firestore에 저장된 값이 있으면 그게 우선) */
-const DEFAULT_ADMIN_PASSWORD = "!!2026";
+const DEFAULT_ADMIN_PASSWORD = "관리자2026";
 
 /* 모바일 감지 */
 function isMobile(){
@@ -1070,11 +1088,17 @@ async function loadConfig(){
       state.passwords.admin = d.adminPassword || null;
       state.passwords.url = d.appUrl || null;
       if(d.noPrefix) state.prefix = d.noPrefix;
+      if(d.ourCompany) state.ourCompany = d.ourCompany;
     }
   }catch(e){
     console.warn('설정 로드 실패 (기본값 사용):', e.message);
   }
   state.configLoaded = true;
+  // 우리만 버튼 텍스트 업데이트 (설정 후)
+  if(state.onlyOurs && state.ourCompany){
+    const btn = document.getElementById('onlyOursBtn');
+    if(btn) btn.textContent = `✓ 우리만 (${state.ourCompany})`;
+  }
 }
 
 /* 관리자 디바이스 체크 (2대 제한) */
@@ -1385,6 +1409,11 @@ function render(){
   if(state.onlyLoaded){
     filtered = filtered.filter(o => o.loadingDone || o.origStatus === '부분로딩' || o.origStatus === '가로딩');
   }
+  // 우리 회사 작업분만 보기 (부분 매칭: "올포랜드" → 올포랜드1팀, 올포랜드_M 등 모두 포함)
+  if(state.onlyOurs && state.ourCompany){
+    const kw = state.ourCompany.trim();
+    filtered = filtered.filter(o => o.company && o.company.includes(kw));
+  }
 
   // 보기 모드에 따라 분기
   if(state.viewMode === 'table'){
@@ -1442,9 +1471,15 @@ function renderCompactList(filtered){
     const partialBadge = (o.origStatus === '부분로딩' || o.origStatus === '가로딩')
       ? `<span class="compact-status" style="background:rgba(124,58,237,.18); color:#c4b5fd; border:1px solid rgba(124,58,237,.4)">${esc(o.origStatus)}</span>`
       : '';
+    // 회사 뱃지 (우리 회사면 강조)
+    const isOurs = state.ourCompany && o.company && o.company.includes(state.ourCompany.trim());
+    const companyBadge = o.company
+      ? `<span class="compact-status" style="background:${isOurs?'rgba(245,158,11,.2)':'rgba(99,102,241,.15)'}; color:${isOurs?'#fbbf24':'#a5b4fc'}; border:1px solid ${isOurs?'rgba(245,158,11,.5)':'rgba(99,102,241,.4)'}; font-size:10px">${isOurs?'🏢':''}${esc(o.company)}</span>`
+      : '';
     return `<div class="compact-row ${alClass}" onclick="openDetail('${o.id}')">
       <span class="compact-no">${esc(o.no||'')}</span>
       <span class="compact-name">${esc(o.name||'(공사명 없음)')}</span>
+      ${companyBadge}
       ${partialBadge}
       <span class="compact-status st-${st}">${st}</span>
       ${al ? `<span class="compact-alert ${al.level}">D+${al.days}</span>` : ''}
@@ -1524,6 +1559,11 @@ function renderCard(o){
   const partialBadge = (o.origStatus === '부분로딩' || o.origStatus === '가로딩')
     ? `<span class="card-status" style="background:rgba(124,58,237,.18); color:#c4b5fd; border:1px solid rgba(124,58,237,.4)">${esc(o.origStatus)}</span>`
     : '';
+  // 회사 뱃지 (우리 회사면 강조)
+  const isOurs = state.ourCompany && o.company && o.company.includes(state.ourCompany.trim());
+  const companyBadge = o.company
+    ? `<span class="card-status" style="background:${isOurs?'rgba(245,158,11,.2)':'rgba(99,102,241,.15)'}; color:${isOurs?'#fbbf24':'#a5b4fc'}; border:1px solid ${isOurs?'rgba(245,158,11,.5)':'rgba(99,102,241,.4)'}; font-size:10px">${isOurs?'🏢 ':''}${esc(o.company)}</span>`
+    : '';
 
   // 5개 단계 dots
   const dotsHtml = [1,2,3,4,5].map(i => {
@@ -1540,6 +1580,7 @@ function renderCard(o){
   return `<div class="card ${alClass}" onclick="openDetail('${o.id}')">
     <div class="card-head">
       <span class="card-no">${esc(o.no||'')}</span>
+      ${companyBadge}
       ${partialBadge}
       <span class="card-status ${stClass}">${st}</span>
     </div>
@@ -1630,7 +1671,21 @@ document.getElementById('onlyLoadedBtn').addEventListener('click', () => {
   render();
 });
 
-/* 저장된 정렬 모드 및 숨기기/로딩만 모드 복원 */
+/* 우리 회사 작업분만 보기 토글 */
+document.getElementById('onlyOursBtn').addEventListener('click', () => {
+  if(!state.ourCompany){
+    alert('먼저 ⚙️ 관리자 → 🏢 우리 회사 설정 에서 회사명을 입력해주세요.');
+    return;
+  }
+  state.onlyOurs = !state.onlyOurs;
+  const btn = document.getElementById('onlyOursBtn');
+  btn.dataset.active = state.onlyOurs ? 'true' : 'false';
+  btn.textContent = state.onlyOurs ? `✓ 우리만 (${state.ourCompany})` : '🏢 우리만';
+  localStorage.setItem('jungbu_onlyOurs', state.onlyOurs ? '1' : '0');
+  render();
+});
+
+/* 저장된 정렬 모드 및 숨기기/로딩만/우리만 모드 복원 */
 (function(){
   const savedSort = localStorage.getItem('jungbu_sortBy');
   if(savedSort){
@@ -1655,6 +1710,13 @@ document.getElementById('onlyLoadedBtn').addEventListener('click', () => {
       btn.dataset.active = 'true';
       btn.textContent = '✓ 로딩만 (해제)';
     }
+  }
+  const savedOurs = localStorage.getItem('jungbu_onlyOurs');
+  if(savedOurs === '1'){
+    state.onlyOurs = true;
+    // 버튼 텍스트는 ourCompany 로드 후에 업데이트됨
+    const btn = document.getElementById('onlyOursBtn');
+    if(btn) btn.dataset.active = 'true';
   }
 })();
 
@@ -2396,7 +2458,7 @@ async function exportToExcel(){
     // ====================================================================
     // Row 1: 메인 타이틀
     // ====================================================================
-    ws.mergeCells('A1:AG1');
+    ws.mergeCells('A1:AH1');
     const titleCell = ws.getCell('A1');
     titleCell.value = '정확도 개선사업 관리대장(신설)';
     titleCell.font = { name:'맑은 고딕', size:18, bold:true, color:{argb:'FF1F2937'} };
@@ -2441,7 +2503,8 @@ async function exportToExcel(){
       AD: '주/야\n구분',
       AE: '지시\n연번',
       AF: '진행사항확인',
-      AG: '진행\n불가\n유형'
+      AG: '진행\n불가\n유형',
+      AH: '컨소\n담당'
     };
     for(const [col, val] of Object.entries(singleHeaders)){
       ws.mergeCells(`${col}3:${col}4`);
@@ -2481,7 +2544,7 @@ async function exportToExcel(){
       right:  { style:'thin',   color:{argb:'FF1F2937'} }
     };
     for(let row = 3; row <= 4; row++){
-      for(let col = 1; col <= 33; col++){
+      for(let col = 1; col <= 34; col++){
         const cell = ws.getRow(row).getCell(col);
         cell.font = headerFont;
         cell.fill = headerFill;
@@ -2495,7 +2558,7 @@ async function exportToExcel(){
     // ====================================================================
     // Row 5: 출력 정보 (사업소 / 일시 / 건수 / 출력자)
     // ====================================================================
-    ws.mergeCells('A5:AG5');
+    ws.mergeCells('A5:AH5');
     const infoCell = ws.getCell('A5');
     infoCell.value = `사업소: 서울시 ${sname}     |     출력일: ${dStr}     |     총 ${state.orders.length}건     |     출력자: ${state.user.name}`;
     infoCell.font = { name:'맑은 고딕', size:10, italic:true, color:{argb:'FF4B5563'} };
@@ -2514,7 +2577,7 @@ async function exportToExcel(){
       const st = (o.origStatus && ['부분로딩','가로딩'].includes(o.origStatus)) ? o.origStatus : orderStatus(o);
       if(stats[st] !== undefined) stats[st]++;
     });
-    ws.mergeCells('A6:AG6');
+    ws.mergeCells('A6:AH6');
     const statsCell = ws.getCell('A6');
     statsCell.value = `[ 미시공 ${stats.미시공}건  |  공사예정 ${stats.공사예정}건  |  공사중 ${stats.공사중}건  |  공사완료 ${stats.공사완료}건  |  측량완료 ${stats.측량완료}건  |  부분로딩 ${stats.부분로딩}건  |  가로딩 ${stats.가로딩}건  |  로딩완료 ${stats.로딩완료}건 ]`;
     statsCell.font = { name:'맑은 고딕', size:9.5, color:{argb:'FF6B7280'} };
@@ -2595,11 +2658,12 @@ async function exportToExcel(){
       row.getCell(28).value = toDate(o.drawingReceivedDate);              // AB: 자료인수일
       row.getCell(29).value = o.siteNotes || '';                          // AC: 현장특이사항
       // AD~AG: 비워둠
+      if(o.company) row.getCell(34).value = o.company;                    // AH: 컨소담당 (업체)
 
       row.height = 24;
 
       // 모든 셀에 기본 스타일 적용 (A~AG)
-      for(let c = 1; c <= 33; c++){
+      for(let c = 1; c <= 34; c++){
         const cell = row.getCell(c);
         cell.font = { name:'맑은 고딕', size:10 };
         cell.alignment = { vertical:'middle', wrapText:true };
@@ -2694,7 +2758,8 @@ async function exportToExcel(){
       30: 8,   // AD 주야
       31: 7,   // AE 연번
       32: 12,  // AF 진행확인
-      33: 8    // AG 불가유형
+      33: 8,   // AG 불가유형
+      34: 12   // AH 컨소담당
     };
     Object.entries(widths).forEach(([c, w]) => ws.getColumn(parseInt(c)).width = w);
 
@@ -2702,7 +2767,7 @@ async function exportToExcel(){
     // 푸터
     // ====================================================================
     const lastRow = 9 + state.orders.length + 1;
-    ws.mergeCells(`A${lastRow}:AG${lastRow}`);
+    ws.mergeCells(`A${lastRow}:AH${lastRow}`);
     const footCell = ws.getCell(`A${lastRow}`);
     footCell.value = `※ 본 자료는 ${dStr} 시점의 현장관리 시스템 데이터입니다. (서울시 ${sname})`;
     footCell.font = { name:'맑은 고딕', size:9, italic:true, color:{argb:'FF999999'} };
@@ -2924,6 +2989,26 @@ async function openAdminPanel(){
   // 현재 접두어
   document.getElementById('adminPrefixCur').textContent = state.prefix || '중부';
   document.getElementById('adminPrefix').value = '';
+  // 현재 우리 회사 + 회사 통계 표시
+  document.getElementById('adminOurCompanyCur').textContent = state.ourCompany || '― (미설정)';
+  document.getElementById('adminOurCompany').value = '';
+  const companyMap = {};
+  state.orders.forEach(o => {
+    if(o.company){
+      companyMap[o.company] = (companyMap[o.company] || 0) + 1;
+    }
+  });
+  const sorted = Object.entries(companyMap).sort((a,b) => b[1]-a[1]);
+  const statEl = document.getElementById('companyStats');
+  if(statEl){
+    if(sorted.length === 0){
+      statEl.textContent = '없음 (엑셀을 먼저 임포트해주세요)';
+      statEl.style.color = 'var(--text-dim)';
+    } else {
+      statEl.innerHTML = sorted.map(([k,v]) => `<span style="display:inline-block; margin-right:8px"><strong>${esc(k)}</strong>(${v})</span>`).join('');
+      statEl.style.color = 'var(--accent)';
+    }
+  }
   // 새 사용자 입력칸 비우기 + 엔터 핸들러
   const userInp = document.getElementById('newUserName');
   if(userInp){
@@ -3081,6 +3166,34 @@ window.savePrefix = async function(){
   }
 };
 
+/* 우리 회사 키워드 저장 */
+window.saveOurCompany = async function(){
+  const co = document.getElementById('adminOurCompany').value.trim();
+  if(!co){ alert('회사명 키워드를 입력해주세요.'); return; }
+  if(co.length > 30){ alert('30자 이내로 입력해주세요.'); return; }
+  // 매칭될 건수 미리 표시
+  const matched = state.orders.filter(o => o.company && o.company.includes(co)).length;
+  if(!confirm(`"${co}" 키워드를 우리 회사로 설정합니다.\n\n매칭되는 작업: ${matched}건\n\n진행할까요?`)) return;
+  try{
+    await db.collection('config').doc('main').set({
+      ourCompany: co,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedBy: state.user.name
+    }, { merge: true });
+    state.ourCompany = co;
+    document.getElementById('adminOurCompany').value = '';
+    document.getElementById('adminOurCompanyCur').textContent = co;
+    // 우리만 버튼 텍스트 갱신
+    if(state.onlyOurs){
+      document.getElementById('onlyOursBtn').textContent = `✓ 우리만 (${co})`;
+    }
+    showToast({ title:'✓ 우리 회사 설정됨', sub:`"${co}" · ${matched}건 매칭` });
+    render();
+  }catch(e){
+    alert('저장 실패: ' + e.message);
+  }
+};
+
 /* ============================================================
    엑셀 일괄 등록 (관리자)
    ============================================================ */
@@ -3148,6 +3261,7 @@ document.getElementById('excelImport').addEventListener('change', async (e) => {
       if(r.bossPhone && !existing.bossPhone) return true;
       if(r.length > 0 && !existing.length) return true;
       if(r.location && !existing.location) return true;
+      if(r.company && !existing.company) return true;
       if(r.chatMessages && r.chatMessages.length > 0 && !existing.excelChatAdded) return true;
       return false;
     });
@@ -3298,6 +3412,7 @@ function parseExcelSheet(sheet){
     const z = row.getCell(26).value;  // 완료일 = 로딩완료일
     const ab = row.getCell(28).value; // 자료인수일 = 준공도 인수일
     const ac = row.getCell(29).value; // 현장특이사항
+    const ah = row.getCell(34).value; // 컨소담당 (업체)
 
     // 지시번호 없거나 숫자 아니면 스킵 (소계/합계 등)
     const num = parseInt(b);
@@ -3351,6 +3466,7 @@ function parseExcelSheet(sheet){
     const loadedDate = toDate(z);     // Z열 = 로딩완료일
     const drawingDate = toDate(ab);   // 자료인수일
     const siteNotes = ac ? String(ac).trim() : ''; // AC열 = 현장특이사항
+    const company = ah ? String(ah).trim() : '';   // AH열 = 컨소담당 (업체)
 
     // 진행상태 → 단계 매핑
     const state_str = String(x||'').trim();
@@ -3362,6 +3478,7 @@ function parseExcelSheet(sheet){
       bossName, bossPhone,
       instructionDate,
       siteNotes,                // AC열 (현장특이사항) - 내보내기 라운드트립용
+      company,                  // AH열 (컨소담당 업체)
       // 단계 기본값
       planned: false, plannedDate: '',
       inProgress: false, inProgressDate: '',
@@ -3513,6 +3630,7 @@ async function importToFirestore(newRecords, updateRecords, existingMap, resultD
       if(r.bossPhone && !existing.bossPhone) patch.bossPhone = r.bossPhone;
       if(r.length > 0 && !existing.length) patch.length = r.length;
       if(r.location && !existing.location) patch.location = r.location;
+      if(r.company && !existing.company) patch.company = r.company;
 
       // 채팅 메시지 (특이사항·부분로딩 기록) - 한 번만 추가
       const chatMsgs = r.chatMessages || [];
