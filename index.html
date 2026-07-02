@@ -296,6 +296,11 @@
   #statsBtn{background:rgba(245,158,11,.15); color:#fbbf24; border-color:rgba(245,158,11,.4)}
   #statsBtn:hover{background:rgba(245,158,11,.25)}
 
+  /* 🎭 v3.4: 역할별 UI (현장팀은 관리자/전산 관련 UI 숨김) */
+  body.role-user #statsBtn,
+  body.role-user #btnExport,
+  body.role-user .cloud-input-section{ display:none !important; }
+
   /* 모바일에서는 "표" 버튼만 숨김 (테이블은 가로 스크롤 필요해서 모바일 부적합) */
   @media (max-width: 767px){
     .btn-view[data-view="table"]{display:none}
@@ -535,7 +540,7 @@
 <datalist id="dlCompany"></datalist>
 
 <!-- 제작자 크레딧 + 버전 -->
-<div class="credit">v3.3 · © Seo Young Min</div>
+<div class="credit">v3.4 · © Seo Young Min</div>
 
 <!-- ============== 신규/수정 모달 ============== -->
 <div class="modal" id="formModal">
@@ -1097,6 +1102,10 @@ function doLogin(){
       document.getElementById('app').style.display = 'flex';
       document.getElementById('hWho').textContent = name + (role === 'admin' ? ' 님 🔐' : ' 님');
       applyBranding();
+
+      // 🎭 역할별 UI 제어 (v3.4)
+      document.body.classList.toggle('role-admin', role === 'admin');
+      document.body.classList.toggle('role-user', role === 'user');
 
       // 관리자 UI 표시
       if(role === 'admin'){
@@ -2025,7 +2034,7 @@ function renderDetail(o){
       </div>
     </div>
 
-    <div class="section" style="border:2px solid rgba(245,158,11,.4); background:rgba(245,158,11,.05); border-radius:10px">
+    <div class="section cloud-input-section" style="border:2px solid rgba(245,158,11,.4); background:rgba(245,158,11,.05); border-radius:10px">
       <div class="section-head" style="background:rgba(245,158,11,.12); color:#fbbf24"><span class="ic">☁️</span> 전산팀 입력 영역 <span style="margin-left:auto; font-size:11px; color:var(--text-dim); font-weight:500">우리가 입력</span></div>
       <div class="section-body">
         <label style="display:flex; align-items:center; gap:10px; padding:12px; background:${o.itLoaded ? 'rgba(56,189,248,.15)' : 'rgba(56,189,248,.05)'}; border:2px solid ${o.itLoaded ? 'rgba(56,189,248,.5)' : 'rgba(56,189,248,.2)'}; border-radius:10px; cursor:pointer; margin-bottom:12px; transition:all .15s">
@@ -2049,7 +2058,7 @@ function renderDetail(o){
     </div>
 
     <div class="section" style="background:rgba(148,163,184,.05); border:1px solid rgba(148,163,184,.2); border-radius:10px">
-      <div class="section-head" style="background:rgba(148,163,184,.08); color:#94a3b8"><span class="ic">🏗</span> 현장 관리 정보 <span style="margin-left:auto; font-size:11px; color:var(--text-dim); font-weight:500">엑셀에서 자동 갱신 · 읽기 전용</span></div>
+      <div class="section-head" style="background:rgba(148,163,184,.08); color:#94a3b8"><span class="ic">🏗</span> 현장 관리 정보 <span style="margin-left:auto; font-size:11px; color:var(--text-dim); font-weight:500">현장에서 입력</span></div>
       <div class="section-body">
         ${renderSiteInfo(o)}
       </div>
@@ -2118,56 +2127,121 @@ function renderDetail(o){
   if(ci) ci.addEventListener('keydown', e => { if(e.key==='Enter') sendChat(); });
 }
 
-/* 🏗 현장 관리 정보 렌더 (읽기 전용) */
+/* 🏗 현장 관리 정보 렌더 (v3.4 - 편집 가능) */
 function renderSiteInfo(o){
-  const items = [];
-  // 지시번호 정보
-  if(o.no25) items.push({ ic:'🏷', k:'25년 지시번호', v:o.no25 });
-  if(o.instSeq) items.push({ ic:'📍', k:'지시연번', v:o.instSeq });
-  if(o.constNo) items.push({ ic:'🔖', k:'공사번호', v:o.constNo });
-  if(o.inspection) items.push({ ic:'⚖️', k:'심사구분', v:o.inspection });
-  // 공사 스펙
-  if(o.diameter) items.push({ ic:'📏', k:'구경', v:o.diameter });
-  if(o.dayNight) items.push({ ic:'🕐', k:'주/야 구분', v:o.dayNight });
-  // 현장팀
-  if(o.company) items.push({ ic:'👷', k:'컨소담당(현장팀)', v:o.company, hl:true });
-  // 진행 관련
-  if(o.progressCheck) items.push({ ic:'✅', k:'진행사항확인', v:o.progressCheck });
-  if(o.blockedType) items.push({ ic:'🚫', k:'진행불가유형', v:o.blockedType, warn:true });
-  // 비고 / 특이사항
-  if(o.remark) items.push({ ic:'📝', k:'비고', v:o.remark, full:true });
-  if(o.siteNotes) items.push({ ic:'💬', k:'현장특이사항', v:o.siteNotes, full:true });
-
-  // 추진실적 (I~M열) - 하나라도 있으면 별도 블록
-  const perfHas = o.perfActual || o.perfTotal || o.perfSurvey || o.perfDetect || o.perfUndetect || o.perfMeasure;
-
-  if(items.length === 0 && !perfHas){
-    return '<div style="font-size:12px; color:var(--text-dim); text-align:center; padding:12px">📭 엑셀 임포트 시 자동으로 채워집니다.</div>';
-  }
-
-  const rows = items.map(it => `
-    <div class="info-row" style="${it.full?'flex-direction:column; align-items:flex-start; gap:4px':''}">
-      <div class="k">${it.ic} ${it.k}</div>
-      <div class="v" style="${it.hl?'color:#a5b4fc; font-weight:700':''}${it.warn?';color:#fca5a5':''}">${esc(it.v)}</div>
-    </div>
-  `).join('');
-
-  const perfBlock = perfHas ? `
-    <div style="margin-top:10px; padding:10px 12px; background:rgba(56,189,248,.06); border:1px solid rgba(56,189,248,.2); border-radius:8px">
-      <div style="font-size:12px; font-weight:700; color:#7dd3fc; margin-bottom:6px">📊 추진실적 (m)</div>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(80px, 1fr)); gap:6px; font-size:11.5px">
-        ${o.perfActual ? `<div><span style="color:var(--text-dim)">공사실적:</span> <strong>${esc(o.perfActual)}</strong></div>` : ''}
-        ${o.perfTotal ? `<div><span style="color:var(--text-dim)">계:</span> <strong>${Number(o.perfTotal).toLocaleString()}</strong></div>` : ''}
-        ${o.perfSurvey ? `<div><span style="color:var(--text-dim)">조사:</span> <strong>${Number(o.perfSurvey).toLocaleString()}</strong></div>` : ''}
-        ${o.perfDetect ? `<div><span style="color:var(--text-dim)">탐사:</span> <strong>${Number(o.perfDetect).toLocaleString()}</strong></div>` : ''}
-        ${o.perfUndetect ? `<div><span style="color:var(--text-dim)">불탐:</span> <strong>${Number(o.perfUndetect).toLocaleString()}</strong></div>` : ''}
-        ${o.perfMeasure ? `<div><span style="color:var(--text-dim)">측량:</span> <strong>${Number(o.perfMeasure).toLocaleString()}</strong></div>` : ''}
+  return `
+    <div class="field-row">
+      <div class="field"><label>🏷 25년 지시번호</label>
+        <input id="sNo25" value="${esc(o.no25||'')}" placeholder="예: OP-2025-042" autocomplete="off">
+      </div>
+      <div class="field"><label>📍 지시연번</label>
+        <input id="sInstSeq" value="${esc(o.instSeq||'')}" placeholder="예: 3구간" autocomplete="off">
       </div>
     </div>
-  ` : '';
 
-  return rows + perfBlock;
+    <div class="field-row">
+      <div class="field"><label>📏 구경</label>
+        <input id="sDiameter" value="${esc(o.diameter||'')}" placeholder="예: 100 · 300~500" autocomplete="off">
+      </div>
+      <div class="field"><label>🕐 주/야 구분</label>
+        <input id="sDayNight" list="dlDayNight" value="${esc(o.dayNight||'')}" placeholder="주간 / 야간" autocomplete="off">
+        <datalist id="dlDayNight"><option value="주간"><option value="야간"></datalist>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field"><label>👷 컨소담당 (현장팀)</label>
+        <input id="sCompany" list="dlCompany" value="${esc(o.company||'')}" placeholder="예: 삼아, 삼인, 올포랜드1팀" autocomplete="off">
+      </div>
+      <div class="field"><label>🔖 공사번호</label>
+        <input id="sConstNo" value="${esc(o.constNo||'')}" placeholder="예: B202430001" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field"><label>⚖️ 심사구분</label>
+        <input id="sInspection" value="${esc(o.inspection||'')}" placeholder="예: 표준" autocomplete="off">
+      </div>
+      <div class="field"><label>📝 비고</label>
+        <input id="sRemark" value="${esc(o.remark||'')}" placeholder="비고 사항" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field"><label>✅ 진행사항확인</label>
+        <input id="sProgressCheck" value="${esc(o.progressCheck||'')}" placeholder="진행 상태 확인" autocomplete="off">
+      </div>
+      <div class="field"><label>🚫 진행불가유형</label>
+        <input id="sBlockedType" value="${esc(o.blockedType||'')}" placeholder="진행 불가 사유" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:10px">
+      <label>💬 현장특이사항</label>
+      <textarea id="sSiteNotes" rows="2" placeholder="현장에서 유의할 특이사항" style="width:100%; padding:8px 10px; background:var(--ink1); border:1px solid var(--line); border-radius:8px; color:var(--text); font-size:13px; resize:vertical; font-family:inherit">${esc(o.siteNotes||'')}</textarea>
+    </div>
+
+    <!-- 📊 추진실적 (m) -->
+    <div style="margin:14px 0 10px; padding:12px; background:rgba(56,189,248,.06); border:1px solid rgba(56,189,248,.2); border-radius:8px">
+      <div style="font-size:12px; font-weight:700; color:#7dd3fc; margin-bottom:10px">📊 추진실적 (m) — 조사·탐사·불탐·측량</div>
+      <div class="field-row">
+        <div class="field"><label>조사</label>
+          <input id="sPerfSurvey" type="number" step="0.1" value="${o.perfSurvey||''}" placeholder="0.0" autocomplete="off">
+        </div>
+        <div class="field"><label>탐사</label>
+          <input id="sPerfDetect" type="number" step="0.1" value="${o.perfDetect||''}" placeholder="0.0" autocomplete="off">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>불탐</label>
+          <input id="sPerfUndetect" type="number" step="0.1" value="${o.perfUndetect||''}" placeholder="0.0" autocomplete="off">
+        </div>
+        <div class="field"><label>측량</label>
+          <input id="sPerfMeasure" type="number" step="0.1" value="${o.perfMeasure||''}" placeholder="0.0" autocomplete="off">
+        </div>
+      </div>
+      <div style="font-size:11px; color:var(--text-dim); margin-top:6px; line-height:1.5">
+        💡 계 = 조사 + 탐사 + 불탐 (엑셀에서 자동 계산)
+      </div>
+    </div>
+
+    <button class="btn-primary" style="margin-top:6px" onclick="saveSiteInfo('${o.id}')">💾 현장 정보 저장</button>
+
+    <div style="font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5">
+      💡 여기서 수정한 값이 <strong>엑셀 내보내기 시 그대로 반영</strong>됩니다.<br>
+      💡 엑셀 재임포트 시에도 이 값들은 그대로 유지됩니다.
+    </div>
+  `;
 }
+
+/* 현장 정보 저장 */
+window.saveSiteInfo = async function(id){
+  const patch = {
+    no25: document.getElementById('sNo25').value.trim(),
+    instSeq: document.getElementById('sInstSeq').value.trim(),
+    diameter: document.getElementById('sDiameter').value.trim(),
+    dayNight: document.getElementById('sDayNight').value.trim(),
+    company: document.getElementById('sCompany').value.trim(),
+    constNo: document.getElementById('sConstNo').value.trim(),
+    inspection: document.getElementById('sInspection').value.trim(),
+    remark: document.getElementById('sRemark').value.trim(),
+    progressCheck: document.getElementById('sProgressCheck').value.trim(),
+    blockedType: document.getElementById('sBlockedType').value.trim(),
+    siteNotes: document.getElementById('sSiteNotes').value.trim(),
+    perfSurvey: Math.round((parseFloat(document.getElementById('sPerfSurvey').value) || 0) * 10) / 10,
+    perfDetect: Math.round((parseFloat(document.getElementById('sPerfDetect').value) || 0) * 10) / 10,
+    perfUndetect: Math.round((parseFloat(document.getElementById('sPerfUndetect').value) || 0) * 10) / 10,
+    perfMeasure: Math.round((parseFloat(document.getElementById('sPerfMeasure').value) || 0) * 10) / 10,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: state.user.name
+  };
+  try{
+    await db.collection('orders').doc(id).update(patch);
+    showToast({ title:'✓ 현장 정보 저장', sub: `by ${state.user.name}` });
+  }catch(e){
+    alert('저장 실패: ' + e.message);
+  }
+};
 
 /* 단계 행 HTML 생성 */
 function stageRowHtml(stageNum, label, o){
