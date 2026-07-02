@@ -535,7 +535,7 @@
 <datalist id="dlCompany"></datalist>
 
 <!-- 제작자 크레딧 + 버전 -->
-<div class="credit">v3.2 · © Seo Young Min</div>
+<div class="credit">v3.3 · © Seo Young Min</div>
 
 <!-- ============== 신규/수정 모달 ============== -->
 <div class="modal" id="formModal">
@@ -3748,37 +3748,53 @@ function parseExcelSheet(sheet){
   const prefix = state.prefix || '중부';
   const records = [];
 
+  // 수식 셀에서 계산된 결과 값 뽑아내는 헬퍼
+  // ExcelJS는 수식이면 { formula, result } 객체를 반환함
+  const cellRaw = (cell) => {
+    const v = cell.value;
+    if(v === null || v === undefined) return null;
+    // 수식 셀: { formula: '...', result: 계산된값 }
+    if(typeof v === 'object' && v !== null && 'result' in v) return v.result;
+    // 수식 셀 (result 없음): 값 못 뽑음
+    if(typeof v === 'object' && v !== null && 'formula' in v) return null;
+    // 리치 텍스트 { richText: [...] }
+    if(typeof v === 'object' && v !== null && 'richText' in v){
+      return v.richText.map(t => t.text).join('');
+    }
+    return v;
+  };
+  // m 단위 숫자: 소수점 1자리로 반올림
+  const cellM = (cell) => {
+    const v = cellRaw(cell);
+    if(v === null || v === undefined || v === '') return 0;
+    const n = parseFloat(v);
+    if(isNaN(n)) return 0;
+    return Math.round(n * 10) / 10;
+  };
+  // 문자 셀 (수식 결과가 문자열일 수도 있음)
+  const cellStr = (cell) => {
+    const v = cellRaw(cell);
+    if(v === null || v === undefined) return '';
+    return String(v).trim();
+  };
+
   // 9행부터 데이터
   for(let r = 9; r <= sheet.rowCount; r++){
     const row = sheet.getRow(r);
-    const b = row.getCell(2).value;   // 작업지시번호
-    const c = row.getCell(3).value;   // 작업지시번호(25년)
+    const b = row.getCell(2).value;   // 작업지시번호 (숫자, 수식 아님)
+    const c = row.getCell(3).value;   // C: 25년 지시번호
     const e = row.getCell(5).value;   // 공사명+위치
-    const f = row.getCell(6).value;   // F: 구경
-    const g = row.getCell(7).value;   // 연장
-    const h = row.getCell(8).value;   // H: 공사실적
-    const i = row.getCell(9).value;   // I: 계
-    const j = row.getCell(10).value;  // J: 조사
-    const k = row.getCell(11).value;  // K: 탐사
-    const l = row.getCell(12).value;  // L: 불탐
-    const m = row.getCell(13).value;  // M: 측량
-    const oCell = row.getCell(15).value; // O열: 로딩 실연장 (=실연장)
     const p = row.getCell(16).value;  // 착공
     const q = row.getCell(17).value;  // 준공
     const s = row.getCell(19).value;  // 측량지시일
-    const t = row.getCell(20).value;  // T: 공사번호
-    const u = row.getCell(21).value;  // U: 비고
-    const v = row.getCell(22).value;  // V: 심사구분
     const x = row.getCell(24).value;  // 진행상태
     const y = row.getCell(25).value;  // 현장연락처
     const z = row.getCell(26).value;  // 완료일 = 로딩완료일
-    const ab = row.getCell(28).value; // 자료인수일 = 준공도 인수일
+    const ab = row.getCell(28).value; // 자료인수일
     const ac = row.getCell(29).value; // 현장특이사항
-    const ad = row.getCell(30).value; // AD: 주/야
-    const ae = row.getCell(31).value; // AE: 지시연번
-    const af = row.getCell(32).value; // AF: 진행사항확인
-    const ag = row.getCell(33).value; // AG: 진행불가유형
     const ah = row.getCell(34).value; // AH: 컨소담당 (현장팀)
+    // 아래 컬럼들은 수식일 수 있으므로 헬퍼로 계산된 값 읽기
+    // F, G, H, I, J, K, L, M, N, O, T, U, V, AD, AE, AF, AG
 
     // 지시번호 없거나 숫자 아니면 스킵 (소계/합계 등)
     const num = parseInt(b);
@@ -3833,23 +3849,24 @@ function parseExcelSheet(sheet){
     const drawingDate = toDate(ab);   // 자료인수일
     const siteNotes = ac ? String(ac).trim() : ''; // AC열 = 현장특이사항
     const company = ah ? String(ah).trim() : '';   // AH열 = 컨소담당 (현장팀)
-    const loadLength = parseFloat(oCell) || 0;     // O열 = 실연장(m)
-    // 현장 관리 필드들 (엑셀에서만 옴)
-    const no25 = c ? String(c).trim() : '';        // C열 = 25년 지시번호
-    const diameter = f ? String(f).trim() : '';    // F열 = 구경
-    const perfActual = h ? String(h).trim() : ''; // H열 = 공사실적
-    const perfTotal = parseFloat(i) || 0;          // I열 = 계(m)
-    const perfSurvey = parseFloat(j) || 0;         // J열 = 조사(m)
-    const perfDetect = parseFloat(k) || 0;         // K열 = 탐사(m)
-    const perfUndetect = parseFloat(l) || 0;       // L열 = 불탐(m)
-    const perfMeasure = parseFloat(m) || 0;        // M열 = 측량(m)
-    const constNo = t ? String(t).trim() : '';     // T열 = 공사번호
-    const remark = u ? String(u).trim() : '';      // U열 = 비고
-    const inspection = v ? String(v).trim() : ''; // V열 = 심사구분
-    const dayNight = ad ? String(ad).trim() : ''; // AD열 = 주야구분
-    const instSeq = ae ? String(ae).trim() : '';  // AE열 = 지시연번
-    const progressCheck = af ? String(af).trim() : ''; // AF열 = 진행사항확인
-    const blockedType = ag ? String(ag).trim() : '';   // AG열 = 진행불가유형
+    // 🔧 수식 셀에서 계산된 값 정확히 뽑기 (헬퍼 사용) + 소수점 1자리 반올림
+    const diameter = cellStr(row.getCell(6));      // F: 구경 (문자 그대로: "300~500")
+    const gLen = cellM(row.getCell(7));            // G: 연장 (m)
+    const perfActual = cellM(row.getCell(8));      // H: 공사실적 (수식 결과)
+    const perfTotal = cellM(row.getCell(9));       // I: 계 (수식 결과)
+    const perfSurvey = cellM(row.getCell(10));     // J: 조사 (수식 결과)
+    const perfDetect = cellM(row.getCell(11));     // K: 탐사
+    const perfUndetect = cellM(row.getCell(12));   // L: 불탐
+    const perfMeasure = cellM(row.getCell(13));    // M: 측량
+    const loadLength = cellM(row.getCell(15));     // O: 실연장
+    const constNo = cellStr(row.getCell(20));      // T: 공사번호
+    const remark = cellStr(row.getCell(21));       // U: 비고
+    const inspection = cellStr(row.getCell(22));   // V: 심사구분
+    const dayNight = cellStr(row.getCell(30));     // AD: 주야
+    const instSeq = cellStr(row.getCell(31));      // AE: 지시연번
+    const progressCheck = cellStr(row.getCell(32));// AF: 진행사항확인
+    const blockedType = cellStr(row.getCell(33));  // AG: 진행불가유형
+    const no25 = cellStr(row.getCell(3));           // C: 25년 지시번호
 
     // 진행상태 → 단계 매핑
     const state_str = String(x||'').trim();
@@ -3857,7 +3874,7 @@ function parseExcelSheet(sheet){
 
     const rec = {
       no, name, location,
-      length: parseFloat(g) || 0,
+      length: gLen,             // G열 (연장, 소수점 1자리 반올림)
       bossName, bossPhone,
       instructionDate,
       siteNotes,                // AC열 (현장특이사항)
