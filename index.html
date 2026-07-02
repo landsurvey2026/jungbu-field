@@ -535,7 +535,7 @@
 <datalist id="dlCompany"></datalist>
 
 <!-- 제작자 크레딧 + 버전 -->
-<div class="credit">v3.1 · © Seo Young Min</div>
+<div class="credit">v3.2 · © Seo Young Min</div>
 
 <!-- ============== 신규/수정 모달 ============== -->
 <div class="modal" id="formModal">
@@ -2678,37 +2678,109 @@ async function exportToExcel(){
     ws.getRow(4).height = 26;
 
     // ====================================================================
-    // Row 5: 출력 정보 (사업소 / 일시 / 건수 / 출력자)
+    // Row 5~8: 통계 영역 (원본 양식과 동일한 수식 구조)
+    //   - 5행: 계 · 신규 · 전체 합계 (SUM)
+    //   - 6~8행: 컨소별 소계 (삼아 / 삼인* / 올포*) · SUMIFS
+    //   - 우측 V~AA: 진행상태별 카운트 (COUNTIFS)
     // ====================================================================
-    ws.mergeCells('A5:AH5');
-    const infoCell = ws.getCell('A5');
-    infoCell.value = `사업소: 서울시 ${sname}     |     출력일: ${dStr}     |     총 ${state.orders.length}건     |     출력자: ${state.user.name}`;
-    infoCell.font = { name:'맑은 고딕', size:10, italic:true, color:{argb:'FF4B5563'} };
-    infoCell.alignment = { horizontal:'center', vertical:'middle' };
-    infoCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF9FAFB'} };
-    infoCell.border = {
-      bottom: { style:'thin', color:{argb:'FFD1D5DB'} }
-    };
-    ws.getRow(5).height = 22;
+    const lastDataRow = 9 + state.orders.length - 1;
+    const L = lastDataRow;  // 데이터 마지막 행 (수식 범위 상한)
 
-    // ====================================================================
-    // Row 6: 통계 요약
-    // ====================================================================
-    const stats = { 미시공:0, 공사예정:0, 공사중:0, 공사완료:0, 측량완료:0, 부분로딩:0, 가로딩:0, 로딩완료:0 };
-    state.orders.forEach(o => {
-      const st = (o.origStatus && ['부분로딩','가로딩'].includes(o.origStatus)) ? o.origStatus : orderStatus(o);
-      if(stats[st] !== undefined) stats[st]++;
+    // 좌측 통계 구조 (원본과 동일: 병합 없이 각 셀에 라벨/수식)
+    ws.getCell('A5').value = `${prefix}\n지역`;
+    ws.getCell('A6').value = prefix;
+    ws.getCell('A7').value = prefix;
+    ws.getCell('A8').value = prefix;
+
+    ws.getCell('C5').value = '계';
+    ws.getCell('C6').value = '소계';
+    ws.getCell('C7').value = '소계';
+    ws.getCell('C8').value = '소계';
+
+    ws.getCell('D5').value = '신규';
+    ws.getCell('D6').value = '삼아';
+    ws.getCell('D7').value = '삼인';
+    ws.getCell('D8').value = '올포';
+
+    // 행 5: 전체 합계 (=SUM 6:8)
+    ws.getCell('E5').value = { formula: `COUNTIFS($D$9:$D$${L},$D$5,$A$9:$A$${L},$A$7)` };
+    ['G','H','I','J','K','L','M','N','O'].forEach(col => {
+      ws.getCell(`${col}5`).value = { formula: `SUM(${col}6:${col}8)` };
     });
-    ws.mergeCells('A6:AH6');
-    const statsCell = ws.getCell('A6');
-    statsCell.value = `[ 미시공 ${stats.미시공}건  |  공사예정 ${stats.공사예정}건  |  공사중 ${stats.공사중}건  |  공사완료 ${stats.공사완료}건  |  측량완료 ${stats.측량완료}건  |  부분로딩 ${stats.부분로딩}건  |  가로딩 ${stats.가로딩}건  |  로딩완료 ${stats.로딩완료}건 ]`;
-    statsCell.font = { name:'맑은 고딕', size:9.5, color:{argb:'FF6B7280'} };
-    statsCell.alignment = { horizontal:'center', vertical:'middle' };
-    ws.getRow(6).height = 18;
 
-    // Row 7-8: 빈 간격 (살짝 띄움)
-    ws.getRow(7).height = 6;
-    ws.getRow(8).height = 6;
+    // 행 6: 삼아 소계 (SUMIFS)
+    ws.getCell('E6').value = { formula: `COUNTIFS($AH$9:$AH$${L},"삼아",$A$9:$A$${L},$A$7)` };
+    ['G','H','J','K','L','M','N','O'].forEach(col => {
+      ws.getCell(`${col}6`).value = { formula: `SUMIFS($${col}$9:$${col}$${L},$A$9:$A$${L},$A$7,$AH$9:$AH$${L},"삼아")` };
+    });
+    ws.getCell('I6').value = { formula: `SUM(J6:L6)` };
+
+    // 행 7: 삼인* 소계 (SUMIFS, 와일드카드)
+    ws.getCell('E7').value = { formula: `COUNTIFS($AH$9:$AH$${L},"삼인*",$A$9:$A$${L},$A$7)` };
+    ['G','H','J','K','L','M','N','O'].forEach(col => {
+      ws.getCell(`${col}7`).value = { formula: `SUMIFS($${col}$9:$${col}$${L},$A$9:$A$${L},$A$7,$AH$9:$AH$${L},"삼인*")` };
+    });
+    ws.getCell('I7').value = { formula: `SUM(J7:L7)` };
+
+    // 행 8: 올포* 소계 (SUMIFS, 와일드카드)
+    ws.getCell('E8').value = { formula: `COUNTIFS($AH$9:$AH$${L},"올포*",$A$9:$A$${L},$A$7)` };
+    ['G','H','J','K','L','M','N','O'].forEach(col => {
+      ws.getCell(`${col}8`).value = { formula: `SUMIFS($${col}$9:$${col}$${L},$A$9:$A$${L},$A$7,$AH$9:$AH$${L},"올포*")` };
+    });
+    ws.getCell('I8').value = { formula: `SUM(J8:L8)` };
+
+    // 우측 진행상태 통계 (V~AA)
+    ws.getCell('V5').value = '합계';
+    ['W','X','Y','Z','AA'].forEach(col => {
+      ws.getCell(`${col}5`).value = { formula: `SUM(${col}7:${col}8)` };
+    });
+    ws.getCell('V7').value = { formula: `W7+X7+Y7+Z7` };
+    ws.getCell('W7').value = { formula: `COUNTIFS($A$9:$A$${L},"${prefix}",$X$9:$X$${L},"미시공")` };
+    ws.getCell('X7').value = { formula: `COUNTIFS($A$9:$A$${L},"${prefix}",$X$9:$X$${L},"공사중")` };
+    ws.getCell('Y7').value = { formula: `COUNTIFS($A$9:$A$${L},"${prefix}",$X$9:$X$${L},"공사완료")` };
+    ws.getCell('Z7').value = { formula: `COUNTIFS($A$9:$A$${L},"${prefix}",$X$9:$X$${L},"*로딩*")` };
+    ws.getCell('AA7').value = { formula: `COUNTIFS($A$9:$A$${L},"${prefix}",$AA$9:$AA$${L},"●")` };
+    ws.getCell('T8').value = { formula: `W8+X8+Y8+Z8` };
+    ws.getCell('V8').value = { formula: `"취소 "&COUNTIFS($D$9:$D$${L},"",$A$9:$A$${L},$A$7)&" 건"` };
+
+    // AH7:AH8 병합해서 '컨소담당' 라벨 (원본 그대로)
+    ws.mergeCells('AH7:AH8');
+    ws.getCell('AH7').value = '컨소담당';
+
+    // 통계 영역 셀 스타일
+    const statFont = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF1F2937'} };
+    const statFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF9FAFB'} };
+    const statBorder = {
+      top:    { style:'thin', color:{argb:'FFD1D5DB'} },
+      bottom: { style:'thin', color:{argb:'FFD1D5DB'} },
+      left:   { style:'thin', color:{argb:'FFD1D5DB'} },
+      right:  { style:'thin', color:{argb:'FFD1D5DB'} }
+    };
+    for(let r = 5; r <= 8; r++){
+      for(let col = 1; col <= 34; col++){
+        const cell = ws.getRow(r).getCell(col);
+        if(!cell.font || !cell.font.name) cell.font = statFont;
+        cell.fill = statFill;
+        cell.border = statBorder;
+        cell.alignment = { horizontal:'center', vertical:'middle', wrapText:true };
+        // 소계 행의 수치는 우측 정렬
+        if([7, 8, 9, 10, 11, 12, 13, 14, 15].includes(col) && r >= 6){
+          cell.alignment = { horizontal:'right', vertical:'middle', wrapText:true };
+          cell.numFmt = '#,##0.0';
+        }
+      }
+      ws.getRow(r).height = r === 5 ? 24 : 22;
+    }
+    // '계' 5행은 더 진한 배경
+    for(let col = 1; col <= 34; col++){
+      const cell = ws.getRow(5).getCell(col);
+      cell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFE0F2F1'} };
+      cell.font = { name:'맑은 고딕', size:11, bold:true, color:{argb:'FF065F46'} };
+    }
+    // D열 컨소 라벨 색상
+    ws.getCell('D6').font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF7C3AED'} };
+    ws.getCell('D7').font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FF0891B2'} };
+    ws.getCell('D8').font = { name:'맑은 고딕', size:10.5, bold:true, color:{argb:'FFEA580C'} };
 
     // ====================================================================
     // 유틸 함수
@@ -2763,8 +2835,10 @@ async function exportToExcel(){
       row.getCell(5).value  = combineName(o);                             // E: 공사명+위치
       if(o.diameter) row.getCell(6).value = o.diameter;                  // F: 구경
       if(o.length) row.getCell(7).value = Number(o.length);              // G: 연장
-      if(o.perfActual) row.getCell(8).value = o.perfActual;              // H: 공사실적
-      if(o.perfTotal) row.getCell(9).value = Number(o.perfTotal);        // I: 계
+      // H: 공사실적 = I열 그대로 참조 (원본 수식)
+      row.getCell(8).value = { formula: `I${rowIdx}` };
+      // I: 계 = 조사+탐사+불탐 (원본 수식)
+      row.getCell(9).value = { formula: `J${rowIdx}+K${rowIdx}+L${rowIdx}` };
       if(o.perfSurvey) row.getCell(10).value = Number(o.perfSurvey);     // J: 조사
       if(o.perfDetect) row.getCell(11).value = Number(o.perfDetect);     // K: 탐사
       if(o.perfUndetect) row.getCell(12).value = Number(o.perfUndetect); // L: 불탐
