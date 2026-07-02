@@ -1071,13 +1071,8 @@ function doLogin(){
         return;
       }
 
-      // 관리자 모드: 모바일 차단 + 디바이스 2대 제한
+      // 관리자(=전산팀) 모드: PC/모바일 모두 허용, 디바이스 3대 제한
       if(role === 'admin'){
-        if(isMobile()){
-          err.textContent = '🚫 관리자는 PC에서만 접속 가능합니다.';
-          err.style.color = '#fb7185';
-          return;
-        }
         const allowed = await checkAdminDevice(name);
         if(!allowed){
           err.textContent = '🚫 관리자 PC는 최대 3대까지 등록 가능합니다.';
@@ -2058,7 +2053,7 @@ function renderDetail(o){
     </div>
 
     <div class="section" style="background:rgba(148,163,184,.05); border:1px solid rgba(148,163,184,.2); border-radius:10px">
-      <div class="section-head" style="background:rgba(148,163,184,.08); color:#94a3b8"><span class="ic">🏗</span> 현장 관리 정보 <span style="margin-left:auto; font-size:11px; color:var(--text-dim); font-weight:500">현장에서 입력</span></div>
+      <div class="section-head" style="background:rgba(148,163,184,.08); color:#94a3b8"><span class="ic">🏗</span> 현장 관리 정보 <span style="margin-left:auto; font-size:11px; color:var(--text-dim); font-weight:500">${state.role==='admin' ? '전산팀/관리자 입력' : '컨소담당·특이사항만 현장 입력'}</span></div>
       <div class="section-body">
         ${renderSiteInfo(o)}
       </div>
@@ -2127,63 +2122,61 @@ function renderDetail(o){
   if(ci) ci.addEventListener('keydown', e => { if(e.key==='Enter') sendChat(); });
 }
 
-/* 🏗 현장 관리 정보 렌더 (v3.4 - 편집 가능) */
-function renderSiteInfo(o){
+/* 읽기 전용 필드 표시 (현장 role에서 편집 불가 항목) */
+function roField(label, value, placeholder){
+  const v = value ? esc(value) : `<span style="color:var(--text-dim)">${placeholder||'—'}</span>`;
   return `
-    <div class="field-row">
-      <div class="field"><label>🏷 25년 지시번호</label>
-        <input id="sNo25" value="${esc(o.no25||'')}" placeholder="예: OP-2025-042" autocomplete="off">
-      </div>
-      <div class="field"><label>📍 지시연번</label>
-        <input id="sInstSeq" value="${esc(o.instSeq||'')}" placeholder="예: 3구간" autocomplete="off">
-      </div>
+    <div class="field">
+      <label>${label}</label>
+      <div style="padding:8px 10px; background:rgba(148,163,184,.06); border:1px solid var(--line); border-radius:8px; color:var(--text); font-size:13px; min-height:18px">${v}</div>
     </div>
+  `;
+}
 
-    <div class="field-row">
-      <div class="field"><label>📏 구경</label>
-        <input id="sDiameter" value="${esc(o.diameter||'')}" placeholder="예: 100 · 300~500" autocomplete="off">
-      </div>
-      <div class="field"><label>🕐 주/야 구분</label>
-        <input id="sDayNight" list="dlDayNight" value="${esc(o.dayNight||'')}" placeholder="주간 / 야간" autocomplete="off">
-        <datalist id="dlDayNight"><option value="주간"><option value="야간"></datalist>
-      </div>
-    </div>
+/* 🏗 현장 관리 정보 렌더 (v3.5 - 역할별 편집 권한 분리)
+   👷 컨소담당 · 💬 현장특이사항 → 현장/전산/관리자 모두 편집 가능
+   나머지 항목 → 전산팀/관리자만 편집 가능, 현장은 읽기 전용 */
+function renderSiteInfo(o){
+  const canEditAll = state.role === 'admin'; // 전산팀=관리자만 전체 편집
 
-    <div class="field-row">
-      <div class="field"><label>👷 컨소담당 (현장팀)</label>
-        <input id="sCompany" list="dlCompany" value="${esc(o.company||'')}" placeholder="예: 삼아, 삼인, 올포랜드1팀" autocomplete="off">
-      </div>
-      <div class="field"><label>🔖 공사번호</label>
-        <input id="sConstNo" value="${esc(o.constNo||'')}" placeholder="예: B202430001" autocomplete="off">
-      </div>
-    </div>
+  const no25Field = canEditAll
+    ? `<div class="field"><label>🏷 25년 지시번호</label><input id="sNo25" value="${esc(o.no25||'')}" placeholder="예: OP-2025-042" autocomplete="off"></div>`
+    : roField('🏷 25년 지시번호', o.no25, '예: OP-2025-042');
 
-    <div class="field-row">
-      <div class="field"><label>⚖️ 심사구분</label>
-        <input id="sInspection" value="${esc(o.inspection||'')}" placeholder="예: 표준" autocomplete="off">
-      </div>
-      <div class="field"><label>📝 비고</label>
-        <input id="sRemark" value="${esc(o.remark||'')}" placeholder="비고 사항" autocomplete="off">
-      </div>
-    </div>
+  const instSeqField = canEditAll
+    ? `<div class="field"><label>📍 지시연번</label><input id="sInstSeq" value="${esc(o.instSeq||'')}" placeholder="예: 3구간" autocomplete="off"></div>`
+    : roField('📍 지시연번', o.instSeq, '예: 3구간');
 
-    <div class="field-row">
-      <div class="field"><label>✅ 진행사항확인</label>
-        <input id="sProgressCheck" value="${esc(o.progressCheck||'')}" placeholder="진행 상태 확인" autocomplete="off">
-      </div>
-      <div class="field"><label>🚫 진행불가유형</label>
-        <input id="sBlockedType" value="${esc(o.blockedType||'')}" placeholder="진행 불가 사유" autocomplete="off">
-      </div>
-    </div>
+  const diameterField = canEditAll
+    ? `<div class="field"><label>📏 구경</label><input id="sDiameter" value="${esc(o.diameter||'')}" placeholder="예: 100 · 300~500" autocomplete="off"></div>`
+    : roField('📏 구경', o.diameter, '예: 100 · 300~500');
 
-    <div class="field" style="margin-bottom:10px">
-      <label>💬 현장특이사항</label>
-      <textarea id="sSiteNotes" rows="2" placeholder="현장에서 유의할 특이사항" style="width:100%; padding:8px 10px; background:var(--ink1); border:1px solid var(--line); border-radius:8px; color:var(--text); font-size:13px; resize:vertical; font-family:inherit">${esc(o.siteNotes||'')}</textarea>
-    </div>
+  const dayNightField = canEditAll
+    ? `<div class="field"><label>🕐 주/야 구분</label><input id="sDayNight" list="dlDayNight" value="${esc(o.dayNight||'')}" placeholder="주간 / 야간" autocomplete="off"><datalist id="dlDayNight"><option value="주간"><option value="야간"></datalist></div>`
+    : roField('🕐 주/야 구분', o.dayNight, '주간 / 야간');
 
-    <!-- 📊 추진실적 (m) -->
-    <div style="margin:14px 0 10px; padding:12px; background:rgba(56,189,248,.06); border:1px solid rgba(56,189,248,.2); border-radius:8px">
-      <div style="font-size:12px; font-weight:700; color:#7dd3fc; margin-bottom:10px">📊 추진실적 (m) — 조사·탐사·불탐·측량</div>
+  const constNoField = canEditAll
+    ? `<div class="field"><label>🔖 공사번호</label><input id="sConstNo" value="${esc(o.constNo||'')}" placeholder="예: B202430001" autocomplete="off"></div>`
+    : roField('🔖 공사번호', o.constNo, '예: B202430001');
+
+  const inspectionField = canEditAll
+    ? `<div class="field"><label>⚖️ 심사구분</label><input id="sInspection" value="${esc(o.inspection||'')}" placeholder="예: 표준" autocomplete="off"></div>`
+    : roField('⚖️ 심사구분', o.inspection, '예: 표준');
+
+  const remarkField = canEditAll
+    ? `<div class="field"><label>📝 비고</label><input id="sRemark" value="${esc(o.remark||'')}" placeholder="비고 사항" autocomplete="off"></div>`
+    : roField('📝 비고', o.remark, '비고 사항');
+
+  const progressCheckField = canEditAll
+    ? `<div class="field"><label>✅ 진행사항확인</label><input id="sProgressCheck" value="${esc(o.progressCheck||'')}" placeholder="진행 상태 확인" autocomplete="off"></div>`
+    : roField('✅ 진행사항확인', o.progressCheck, '진행 상태 확인');
+
+  const blockedTypeField = canEditAll
+    ? `<div class="field"><label>🚫 진행불가유형</label><input id="sBlockedType" value="${esc(o.blockedType||'')}" placeholder="진행 불가 사유" autocomplete="off"></div>`
+    : roField('🚫 진행불가유형', o.blockedType, '진행 불가 사유');
+
+  // 📊 추진실적 4항목: 전산팀/관리자만 편집
+  const perfBlock = canEditAll ? `
       <div class="field-row">
         <div class="field"><label>조사</label>
           <input id="sPerfSurvey" type="number" step="0.1" value="${o.perfSurvey||''}" placeholder="0.0" autocomplete="off">
@@ -2203,41 +2196,98 @@ function renderSiteInfo(o){
       <div style="font-size:11px; color:var(--text-dim); margin-top:6px; line-height:1.5">
         💡 계 = 조사 + 탐사 + 불탐 (엑셀에서 자동 계산)
       </div>
+  ` : `
+      <div class="field-row">
+        ${roField('조사', o.perfSurvey, '0.0')}
+        ${roField('탐사', o.perfDetect, '0.0')}
+      </div>
+      <div class="field-row">
+        ${roField('불탐', o.perfUndetect, '0.0')}
+        ${roField('측량', o.perfMeasure, '0.0')}
+      </div>
+  `;
+
+  return `
+    <div class="field-row">
+      ${no25Field}
+      ${instSeqField}
     </div>
 
-    <button class="btn-primary" style="margin-top:6px" onclick="saveSiteInfo('${o.id}')">💾 현장 정보 저장</button>
+    <div class="field-row">
+      ${diameterField}
+      ${dayNightField}
+    </div>
+
+    <div class="field-row">
+      <div class="field"><label>👷 컨소담당 (현장팀)</label>
+        <input id="sCompany" list="dlCompany" value="${esc(o.company||'')}" placeholder="예: 삼아, 삼인, 올포랜드1팀" autocomplete="off">
+      </div>
+      ${constNoField}
+    </div>
+
+    <div class="field-row">
+      ${inspectionField}
+      ${remarkField}
+    </div>
+
+    <div class="field-row">
+      ${progressCheckField}
+      ${blockedTypeField}
+    </div>
+
+    <div class="field" style="margin-bottom:10px">
+      <label>💬 현장특이사항</label>
+      <textarea id="sSiteNotes" rows="2" placeholder="현장에서 유의할 특이사항" style="width:100%; padding:8px 10px; background:var(--ink1); border:1px solid var(--line); border-radius:8px; color:var(--text); font-size:13px; resize:vertical; font-family:inherit">${esc(o.siteNotes||'')}</textarea>
+    </div>
+
+    <!-- 📊 추진실적 (m) -->
+    <div style="margin:14px 0 10px; padding:12px; background:rgba(56,189,248,.06); border:1px solid rgba(56,189,248,.2); border-radius:8px">
+      <div style="font-size:12px; font-weight:700; color:#7dd3fc; margin-bottom:10px">📊 추진실적 (m) — 조사·탐사·불탐·측량${canEditAll?'':' <span style=\'color:var(--text-dim); font-weight:500\'>(읽기 전용)</span>'}</div>
+      ${perfBlock}
+    </div>
+
+    <button class="btn-primary" style="margin-top:6px" onclick="saveSiteInfo('${o.id}')">💾 ${canEditAll ? '현장 정보 저장' : '컨소담당 · 현장특이사항 저장'}</button>
 
     <div style="font-size:11px; color:var(--text-dim); margin-top:8px; line-height:1.5">
       💡 여기서 수정한 값이 <strong>엑셀 내보내기 시 그대로 반영</strong>됩니다.<br>
       💡 엑셀 재임포트 시에도 이 값들은 그대로 유지됩니다.
+      ${canEditAll ? '' : '<br>💡 <strong>컨소담당 · 현장특이사항</strong>만 현장에서 수정 가능하며, 나머지 항목은 전산팀/관리자가 관리합니다.'}
     </div>
   `;
 }
 
-/* 현장 정보 저장 */
+/* 현장 정보 저장 (역할별로 저장 가능한 필드가 다름) */
 window.saveSiteInfo = async function(id){
+  const canEditAll = state.role === 'admin';
+
+  // 👷 컨소담당 · 💬 현장특이사항 → 모든 역할 저장 가능
   const patch = {
-    no25: document.getElementById('sNo25').value.trim(),
-    instSeq: document.getElementById('sInstSeq').value.trim(),
-    diameter: document.getElementById('sDiameter').value.trim(),
-    dayNight: document.getElementById('sDayNight').value.trim(),
     company: document.getElementById('sCompany').value.trim(),
-    constNo: document.getElementById('sConstNo').value.trim(),
-    inspection: document.getElementById('sInspection').value.trim(),
-    remark: document.getElementById('sRemark').value.trim(),
-    progressCheck: document.getElementById('sProgressCheck').value.trim(),
-    blockedType: document.getElementById('sBlockedType').value.trim(),
     siteNotes: document.getElementById('sSiteNotes').value.trim(),
-    perfSurvey: Math.round((parseFloat(document.getElementById('sPerfSurvey').value) || 0) * 10) / 10,
-    perfDetect: Math.round((parseFloat(document.getElementById('sPerfDetect').value) || 0) * 10) / 10,
-    perfUndetect: Math.round((parseFloat(document.getElementById('sPerfUndetect').value) || 0) * 10) / 10,
-    perfMeasure: Math.round((parseFloat(document.getElementById('sPerfMeasure').value) || 0) * 10) / 10,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     updatedBy: state.user.name
   };
+
+  // 나머지 항목 → 전산팀/관리자만 저장 (현장 role은 읽기 전용 표시라 입력칸 자체가 없음)
+  if(canEditAll){
+    patch.no25 = document.getElementById('sNo25').value.trim();
+    patch.instSeq = document.getElementById('sInstSeq').value.trim();
+    patch.diameter = document.getElementById('sDiameter').value.trim();
+    patch.dayNight = document.getElementById('sDayNight').value.trim();
+    patch.constNo = document.getElementById('sConstNo').value.trim();
+    patch.inspection = document.getElementById('sInspection').value.trim();
+    patch.remark = document.getElementById('sRemark').value.trim();
+    patch.progressCheck = document.getElementById('sProgressCheck').value.trim();
+    patch.blockedType = document.getElementById('sBlockedType').value.trim();
+    patch.perfSurvey = Math.round((parseFloat(document.getElementById('sPerfSurvey').value) || 0) * 10) / 10;
+    patch.perfDetect = Math.round((parseFloat(document.getElementById('sPerfDetect').value) || 0) * 10) / 10;
+    patch.perfUndetect = Math.round((parseFloat(document.getElementById('sPerfUndetect').value) || 0) * 10) / 10;
+    patch.perfMeasure = Math.round((parseFloat(document.getElementById('sPerfMeasure').value) || 0) * 10) / 10;
+  }
+
   try{
     await db.collection('orders').doc(id).update(patch);
-    showToast({ title:'✓ 현장 정보 저장', sub: `by ${state.user.name}` });
+    showToast({ title:'✓ 저장 완료', sub: `by ${state.user.name}` });
   }catch(e){
     alert('저장 실패: ' + e.message);
   }
